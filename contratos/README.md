@@ -193,7 +193,19 @@ Roteamento no gateway: as três rotas `/billing/cliente/...` são explícitas e 
 | `POST /orquestracao/fluxos/:fluxoId/reprocessar` | `200`; `422` se o status não for `FALHA_TECNICA`. Reenvia o comando pendente com `messageId` **novo**: o antigo pode ter sido processado com o evento perdido, e com id novo a regra 2 de idempotência faz o consumidor reemitir o resultado |
 | `POST /orquestracao/fluxos/:fluxoId/compensar` | `200`; `422` se o status não for `FALHA_TECNICA` |
 
-**Formato de erro**, igual nos três serviços: `{ "statusCode": number, "message": string, "error": string }`. Códigos usados: `400` validação de DTO, `401` credencial ausente ou inválida, `403` recurso de outro cliente ou role insuficiente, `404` inexistente, `422` transição de estado inválida.
+**Formato de resposta**, igual nos três serviços. Toda resposta usa o mesmo envelope, de sucesso ou de erro, e o código HTTP aparece tanto no status da resposta quanto no campo `status` do corpo:
+
+```json
+{ "success": true, "status": 200, "data": { "id": "...", "nome": "..." } }
+```
+
+```json
+{ "success": false, "status": 404, "message": "Cliente não encontrado" }
+```
+
+Em erro, `message` traz sempre o texto legível. O campo opcional `error`, no formato `{ "message": string, "data": unknown }`, aparece quando há detalhe estruturado — por exemplo numa falha de validação de DTO, em que `error.data` carrega o corpo gerado pelo framework. Não existe campo `statusCode` no corpo.
+
+Códigos usados: `400` validação de DTO, `401` credencial ausente ou inválida, `403` recurso de outro cliente ou role insuficiente, `404` inexistente, `422` transição de estado inválida.
 
 ## 5. JWT
 
