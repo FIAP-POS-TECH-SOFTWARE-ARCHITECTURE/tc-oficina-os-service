@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://oficina.local/contratos/schemas/payloads/EstornarPagamento.schema.json",
+  "title": "EstornarPagamento",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "motivo"
+  ],
+  "properties": {
+    "motivo": {
+      "$ref": "https://oficina.local/contratos/schemas/envelope.schema.json#/$defs/texto"
+    }
+  }
+}

@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://oficina.local/contratos/schemas/payloads/SolicitarDiagnostico.schema.json",
+  "title": "SolicitarDiagnostico",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "cliente",
+    "veiculo",
+    "observacoesAtendimento"
+  ],
+  "properties": {
+    "cliente": {
+      "type": "object",
+      "required": [
+        "id",
+        "nome"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "https://oficina.local/contratos/schemas/envelope.schema.json#/$defs/uuid"
+        },
+        "nome": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "veiculo": {
+      "type": "object",
+      "required": [
+        "id",
+        "placa",
+        "marca",
+        "modelo",
+        "ano"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "https://oficina.local/contratos/schemas/envelope.schema.json#/$defs/uuid"
+        },
+        "placa": {
+          "type": "string",
+          "minLength": 1
+        },
+        "marca": {
+          "type": "string"
+        },
+        "modelo": {
+          "type": "string"
+        },
+        "ano": {
+          "type": "integer",
+          "minimum": 1900
+        }
+      }
+    },
+    "observacoesAtendimento": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 2000
+    }
+  }
+}

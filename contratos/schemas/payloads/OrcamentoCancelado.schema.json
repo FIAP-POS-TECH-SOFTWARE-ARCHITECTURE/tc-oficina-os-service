@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://oficina.local/contratos/schemas/payloads/OrcamentoCancelado.schema.json",
+  "title": "OrcamentoCancelado",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "orcamentoId",
+    "motivo"
+  ],
+  "properties": {
+    "orcamentoId": {
+      "anyOf": [
+        {
+          "$ref": "https://oficina.local/contratos/schemas/envelope.schema.json#/$defs/uuid"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "motivo": {
+      "$ref": "https://oficina.local/contratos/schemas/envelope.schema.json#/$defs/texto"
+    }
+  }
+}

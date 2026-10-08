@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://oficina.local/contratos/schemas/payloads/PagamentoEstornado.schema.json",
+  "title": "PagamentoEstornado",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "orcamentoId",
+    "pagamentoId",
+    "valorCentavos"
+  ],
+  "properties": {
+    "orcamentoId": {
+      "anyOf": [
+        {
+          "$ref": "https://oficina.local/contratos/schemas/envelope.schema.json#/$defs/uuid"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "pagamentoId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "valorCentavos": {
+      "$ref": "https://oficina.local/contratos/schemas/envelope.schema.json#/$defs/centavos"
+    }
+  }
+}

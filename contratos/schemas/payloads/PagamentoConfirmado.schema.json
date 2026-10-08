@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://oficina.local/contratos/schemas/payloads/PagamentoConfirmado.schema.json",
+  "title": "PagamentoConfirmado",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "orcamentoId",
+    "pagamentoId",
+    "valorCentavos",
+    "pagoEm"
+  ],
+  "properties": {
+    "orcamentoId": {
+      "$ref": "https://oficina.local/contratos/schemas/envelope.schema.json#/$defs/uuid"
+    },
+    "pagamentoId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "valorCentavos": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "pagoEm": {
+      "$ref": "https://oficina.local/contratos/schemas/envelope.schema.json#/$defs/dataHora"
+    }
+  }
+}
