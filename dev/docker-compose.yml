@@ -12,6 +12,14 @@ services:
     volumes:
       - postgres_data_v18:/var/lib/postgresql
 
+  ministack:
+    image: ministackorg/ministack:1.5.17
+    container_name: oficina-ministack-dev
+    ports:
+      - "4566:4566"
+    environment:
+      MINISTACK_REGION: us-east-1
+
   sonarqube:
     image: sonarqube:lts-community
     container_name: oficina-sonarqube-dev
