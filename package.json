@@ -93,14 +93,18 @@
 			"json",
 			"ts"
 		],
-		"rootDir": "src",
-		"testRegex": ".*\\.spec\\.ts$",
+		"rootDir": ".",
+		"roots": [
+			"<rootDir>/src",
+			"<rootDir>/test/bdd"
+		],
+		"testRegex": "\\.(spec|steps)\\.ts$",
 		"transform": {
 			"^.+\\.(t|j)s$": "ts-jest"
 		},
 		"collectCoverageFrom": [
-			"**/*.(t|j)s",
-			"!**/*.spec.ts"
+			"src/**/*.(t|j)s",
+			"!src/**/*.spec.ts"
 		],
 		"coveragePathIgnorePatterns": [
 			"/node_modules/",
@@ -111,7 +115,13 @@
 			"src/prisma/prisma.service.ts",
 			"src/result/"
 		],
-		"coverageDirectory": "../coverage",
+		"coverageDirectory": "coverage",
+		"coverageReporters": [
+			"text",
+			"text-summary",
+			"lcov",
+			"json-summary"
+		],
 		"testEnvironment": "node",
 		"coverageThreshold": {
 			"global": {
