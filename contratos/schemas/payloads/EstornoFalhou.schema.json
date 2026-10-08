@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://oficina.local/contratos/schemas/payloads/EstornoFalhou.schema.json",
+  "title": "EstornoFalhou",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "orcamentoId",
+    "pagamentoId",
+    "motivo",
+    "proximaTentativaEm"
+  ],
+  "properties": {
+    "orcamentoId": {
+      "$ref": "https://oficina.local/contratos/schemas/envelope.schema.json#/$defs/uuid"
+    },
+    "pagamentoId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "motivo": {
+      "$ref": "https://oficina.local/contratos/schemas/envelope.schema.json#/$defs/texto"
+    },
+    "proximaTentativaEm": {
+      "$ref": "https://oficina.local/contratos/schemas/envelope.schema.json#/$defs/dataHora"
+    }
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://oficina.local/contratos/schemas/payloads/FluxoConcluido.schema.json",
+  "title": "FluxoConcluido",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [],
+  "properties": {}
+}

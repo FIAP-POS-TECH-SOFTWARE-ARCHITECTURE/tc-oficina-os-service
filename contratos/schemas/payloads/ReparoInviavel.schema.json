@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://oficina.local/contratos/schemas/payloads/ReparoInviavel.schema.json",
+  "title": "ReparoInviavel",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "mecanicoId",
+    "motivo"
+  ],
+  "properties": {
+    "mecanicoId": {
+      "$ref": "https://oficina.local/contratos/schemas/envelope.schema.json#/$defs/uuid"
+    },
+    "motivo": {
+      "$ref": "https://oficina.local/contratos/schemas/envelope.schema.json#/$defs/texto"
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "messageId": "4c9d3e51-6b8a-4f1e-8a5d-9e1f3b4c6d3d",
+  "tipo": "ReparoInviavel",
+  "versao": 1,
+  "ocorridoEm": "2026-10-20T16:00:00.000Z",
+  "origem": "execution",
+  "fluxoId": "3f2a1c9e-8b7d-4e6f-a5b4-c3d2e1f0a9b8",
+  "osId": "9c8b7a6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d",
+  "numeroOs": "OS-2026-000123",
+  "correlationId": "req-5f1e2d3c",
+  "payload": {
+    "mecanicoId": "5e6f7a8b-9c0d-4e1f-8a2b-3c4d5e6f7a8b",
+    "motivo": "Carter danificado: reparo exige peca sem previsao de fornecimento."
+  }
+}
