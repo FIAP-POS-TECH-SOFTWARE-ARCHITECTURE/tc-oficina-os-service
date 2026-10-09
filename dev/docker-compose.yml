@@ -21,7 +21,7 @@ services:
       MINISTACK_REGION: us-east-1
 
   sonarqube:
-    image: sonarqube:lts-community
+    image: sonarqube:community
     container_name: oficina-sonarqube-dev
     ports:
       - "9000:9000"

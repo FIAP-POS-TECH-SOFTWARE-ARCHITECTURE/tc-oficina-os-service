@@ -17,7 +17,7 @@
 		"db:seed": "ts-node -P tsconfig.seed.json prisma/seed.ts",
 		"sonar:up": "docker compose -f dev/docker-compose.yml up -d sonarqube",
 		"sonar:down": "docker compose -f dev/docker-compose.yml stop sonarqube",
-		"sonar:scan": "node scripts/sonar-scan.cjs",
+		"sonar:scan": "bash scripts/sonar-quality-gate.sh",
 		"ministack:up": "docker compose -f dev/docker-compose.yml up -d ministack",
 		"ministack:down": "docker compose -f dev/docker-compose.yml stop ministack",
 		"test:integracao": "jest --config ./test/jest-integracao.json --runInBand",
