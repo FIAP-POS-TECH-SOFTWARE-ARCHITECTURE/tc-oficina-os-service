@@ -17,7 +17,10 @@
 		"db:seed": "ts-node -P tsconfig.seed.json prisma/seed.ts",
 		"sonar:up": "docker compose -f dev/docker-compose.yml up -d sonarqube",
 		"sonar:down": "docker compose -f dev/docker-compose.yml stop sonarqube",
-		"sonar:scan": "node scripts/sonar-scan.cjs",
+		"sonar:scan": "bash scripts/sonar-quality-gate.sh",
+		"ministack:up": "docker compose -f dev/docker-compose.yml up -d ministack",
+		"ministack:down": "docker compose -f dev/docker-compose.yml stop ministack",
+		"test:integracao": "jest --config ./test/jest-integracao.json --runInBand",
 		"test": "jest",
 		"test:watch": "jest --watch",
 		"test:cov": "jest --coverage",
@@ -50,6 +53,10 @@
 		"typescript": "^5.7.3"
 	},
 	"devDependencies": {
+		"@aws-sdk/client-dynamodb": "^3.1147.0",
+		"@aws-sdk/client-sns": "^3.1147.0",
+		"@aws-sdk/client-sqs": "^3.1147.0",
+		"@aws-sdk/client-ssm": "^3.1147.0",
 		"@eslint/eslintrc": "^3.2.0",
 		"@eslint/js": "^9.18.0",
 		"@nestjs/cli": "^11.0.0",
@@ -69,11 +76,12 @@
 		"eslint-plugin-prettier": "^5.2.2",
 		"globals": "^16.0.0",
 		"jest": "^30.0.0",
+		"jest-cucumber": "^4.5.0",
 		"pino-pretty": "^13.1.3",
 		"prettier": "^3.4.2",
-		"sonar-scanner": "^3.1.0",
 		"source-map-support": "^0.5.21",
 		"supertest": "^7.0.0",
+		"testcontainers": "^12.2.0",
 		"ts-jest": "^29.2.5",
 		"ts-loader": "^9.5.2",
 		"tsconfig-paths": "^4.2.0",
@@ -85,14 +93,18 @@
 			"json",
 			"ts"
 		],
-		"rootDir": "src",
-		"testRegex": ".*\\.spec\\.ts$",
+		"rootDir": ".",
+		"roots": [
+			"<rootDir>/src",
+			"<rootDir>/test/bdd"
+		],
+		"testRegex": "\\.(spec|steps)\\.ts$",
 		"transform": {
 			"^.+\\.(t|j)s$": "ts-jest"
 		},
 		"collectCoverageFrom": [
-			"**/*.(t|j)s",
-			"!**/*.spec.ts"
+			"src/**/*.(t|j)s",
+			"!src/**/*.spec.ts"
 		],
 		"coveragePathIgnorePatterns": [
 			"/node_modules/",
@@ -103,7 +115,13 @@
 			"src/prisma/prisma.service.ts",
 			"src/result/"
 		],
-		"coverageDirectory": "../coverage",
+		"coverageDirectory": "coverage",
+		"coverageReporters": [
+			"text",
+			"text-summary",
+			"lcov",
+			"json-summary"
+		],
 		"testEnvironment": "node",
 		"coverageThreshold": {
 			"global": {
