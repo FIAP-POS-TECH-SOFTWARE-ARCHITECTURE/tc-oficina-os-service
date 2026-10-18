@@ -1,7 +1,7 @@
 {
 	"info": {
-		"name": "Oficina API - Tech Challenge FIAP (Fase 2)",
-		"description": "Export da collection Bruno (bruno/Oficina-API). Rode 'Auth > Login' primeiro: o script salva o JWT na variável 'token'. As rotas de cliente (OrdensServico > Acompanhamento OS / Aprovar Orcamento / Rejeitar Orcamento) usam a variável 'clienteToken', um JWT emitido pela autenticação via CPF (repositório tc-oficina-lambda-auth); não há request aqui que o gere, cole o valor manualmente.",
+		"name": "Oficina - OS service",
+		"description": "Export da collection Bruno (bruno/Oficina-API). Rode 'Auth > Login' primeiro: o script salva o JWT na variável 'token'. A rota de cliente (OrdensServico > Acompanhamento OS) usa a variável 'clienteToken', um JWT emitido pela autenticação via CPF (repositório tc-oficina-lambda-auth); não há request aqui que o gere, cole o valor manualmente. As rotas /internal usam o header x-internal-api-key (variável internalApiKey).",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
 	"auth": {
@@ -52,14 +52,6 @@
 			"value": ""
 		},
 		{
-			"key": "itemServicoId",
-			"value": ""
-		},
-		{
-			"key": "itemInsumoId",
-			"value": ""
-		},
-		{
 			"key": "documentoCliente",
 			"value": ""
 		},
@@ -70,6 +62,10 @@
 		{
 			"key": "registroCompraId",
 			"value": ""
+		},
+		{
+			"key": "internalApiKey",
+			"value": "dev-internal-key"
 		}
 	],
 	"item": [
@@ -1090,430 +1086,6 @@
 					]
 				},
 				{
-					"name": "Iniciar Diagnostico",
-					"request": {
-						"method": "POST",
-						"header": [],
-						"url": {
-							"raw": "{{url}}/os/{{osId}}/diagnostico/iniciar",
-							"host": [
-								"{{url}}"
-							],
-							"path": [
-								"os",
-								"{{osId}}",
-								"diagnostico",
-								"iniciar"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Atualizar Diagnostico",
-					"request": {
-						"method": "PATCH",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"url": {
-							"raw": "{{url}}/os/{{osId}}/diagnostico",
-							"host": [
-								"{{url}}"
-							],
-							"path": [
-								"os",
-								"{{osId}}",
-								"diagnostico"
-							]
-						},
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"diagnostico\": \"Veiculo com desgaste acentuado nas pastilhas de freio dianteiras.\"\n  }",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Adicionar Item Servico",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"url": {
-							"raw": "{{url}}/os/{{osId}}/itens-servico",
-							"host": [
-								"{{url}}"
-							],
-							"path": [
-								"os",
-								"{{osId}}",
-								"itens-servico"
-							]
-						},
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"servicoId\": \"{{servicoId}}\",\n    \"quantidade\": 1\n  }",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						}
-					},
-					"response": [],
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"type": "text/javascript",
-								"exec": [
-									"if (pm.response.json() && pm.response.json().data && Array.isArray(pm.response.json().data.itensServico)) {",
-									"  const itens = pm.response.json().data.itensServico;",
-									"  const servicoId = bru.getEnvVar(\"servicoId\");",
-									"  const item = itens",
-									"    .filter((i) => !servicoId || i.servicoId === servicoId)",
-									"    .reduce((latest, current) => {",
-									"      if (!latest) return current;",
-									"      return new Date(current.createdAt) > new Date(latest.createdAt) ? current : latest;",
-									"    }, null) || itens[itens.length - 1];",
-									"",
-									"  if (item && item.id) {",
-									"    pm.collectionVariables.set(\"itemServicoId\", item.id);",
-									"  }",
-									"}"
-								]
-							}
-						}
-					]
-				},
-				{
-					"name": "Remover Item Servico",
-					"request": {
-						"method": "DELETE",
-						"header": [],
-						"url": {
-							"raw": "{{url}}/os/{{osId}}/itens-servico/{{itemServicoId}}",
-							"host": [
-								"{{url}}"
-							],
-							"path": [
-								"os",
-								"{{osId}}",
-								"itens-servico",
-								"{{itemServicoId}}"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Adicionar Item Insumo",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"url": {
-							"raw": "{{url}}/os/{{osId}}/itens-insumo",
-							"host": [
-								"{{url}}"
-							],
-							"path": [
-								"os",
-								"{{osId}}",
-								"itens-insumo"
-							]
-						},
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"insumoId\": \"{{insumoId}}\",\n    \"quantidade\": 1\n  }",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						}
-					},
-					"response": [],
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"type": "text/javascript",
-								"exec": [
-									"if (pm.response.json() && pm.response.json().data && Array.isArray(pm.response.json().data.itensInsumo)) {",
-									"  const itens = pm.response.json().data.itensInsumo;",
-									"  const insumoId = bru.getEnvVar(\"insumoId\");",
-									"  const item = itens.slice().reverse().find((i) => !insumoId || i.insumoId === insumoId) || itens[itens.length - 1];",
-									"  if (item && item.id) {",
-									"    pm.collectionVariables.set(\"itemInsumoId\", item.id);",
-									"  }",
-									"}"
-								]
-							}
-						}
-					]
-				},
-				{
-					"name": "Remover Item Insumo",
-					"request": {
-						"method": "DELETE",
-						"header": [],
-						"url": {
-							"raw": "{{url}}/os/{{osId}}/itens-insumo/{{itemInsumoId}}",
-							"host": [
-								"{{url}}"
-							],
-							"path": [
-								"os",
-								"{{osId}}",
-								"itens-insumo",
-								"{{itemInsumoId}}"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Gerar Orcamento",
-					"request": {
-						"method": "POST",
-						"header": [],
-						"url": {
-							"raw": "{{url}}/os/{{osId}}/orcamento/gerar",
-							"host": [
-								"{{url}}"
-							],
-							"path": [
-								"os",
-								"{{osId}}",
-								"orcamento",
-								"gerar"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Aprovar Orcamento",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"url": {
-							"raw": "{{url}}/os/{{osNumero}}/orcamento/aprovar",
-							"host": [
-								"{{url}}"
-							],
-							"path": [
-								"os",
-								"{{osNumero}}",
-								"orcamento",
-								"aprovar"
-							]
-						},
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{clienteToken}}",
-									"type": "string"
-								}
-							]
-						},
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"observacao\": \"Pode iniciar o serviço\"\n  }",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Desbloquear OS",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"url": {
-							"raw": "{{url}}/os/{{osId}}/desbloquear",
-							"host": [
-								"{{url}}"
-							],
-							"path": [
-								"os",
-								"{{osId}}",
-								"desbloquear"
-							]
-						},
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"observacao\": \"Estoque reposto, OS liberada para execução\"\n  }",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Rejeitar Orcamento",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"url": {
-							"raw": "{{url}}/os/{{osNumero}}/orcamento/rejeitar",
-							"host": [
-								"{{url}}"
-							],
-							"path": [
-								"os",
-								"{{osNumero}}",
-								"orcamento",
-								"rejeitar"
-							]
-						},
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{clienteToken}}",
-									"type": "string"
-								}
-							]
-						},
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"observacao\": \"Cliente desistiu do reparo\"\n  }",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Iniciar Item Servico",
-					"request": {
-						"method": "POST",
-						"header": [],
-						"url": {
-							"raw": "{{url}}/os/{{osId}}/itens-servico/{{itemServicoId}}/iniciar",
-							"host": [
-								"{{url}}"
-							],
-							"path": [
-								"os",
-								"{{osId}}",
-								"itens-servico",
-								"{{itemServicoId}}",
-								"iniciar"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Concluir Item Servico",
-					"request": {
-						"method": "POST",
-						"header": [],
-						"url": {
-							"raw": "{{url}}/os/{{osId}}/itens-servico/{{itemServicoId}}/concluir",
-							"host": [
-								"{{url}}"
-							],
-							"path": [
-								"os",
-								"{{osId}}",
-								"itens-servico",
-								"{{itemServicoId}}",
-								"concluir"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Cancelar Item Servico",
-					"request": {
-						"method": "POST",
-						"header": [],
-						"url": {
-							"raw": "{{url}}/os/{{osId}}/itens-servico/{{itemServicoId}}/cancelar",
-							"host": [
-								"{{url}}"
-							],
-							"path": [
-								"os",
-								"{{osId}}",
-								"itens-servico",
-								"{{itemServicoId}}",
-								"cancelar"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Finalizar",
-					"request": {
-						"method": "POST",
-						"header": [],
-						"url": {
-							"raw": "{{url}}/os/{{osId}}/finalizar",
-							"host": [
-								"{{url}}"
-							],
-							"path": [
-								"os",
-								"{{osId}}",
-								"finalizar"
-							]
-						}
-					},
-					"response": []
-				},
-				{
 					"name": "Entregar",
 					"request": {
 						"method": "POST",
@@ -1882,6 +1454,93 @@
 							"path": [
 								"health",
 								"ready"
+							]
+						},
+						"auth": {
+							"type": "noauth"
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Interno",
+			"item": [
+				{
+					"name": "Cliente por Documento",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "x-internal-api-key",
+								"value": "{{internalApiKey}}"
+							}
+						],
+						"url": {
+							"raw": "{{url}}/internal/clientes/por-documento/{{documentoCliente}}",
+							"host": [
+								"{{url}}"
+							],
+							"path": [
+								"internal",
+								"clientes",
+								"por-documento",
+								"{{documentoCliente}}"
+							]
+						},
+						"auth": {
+							"type": "noauth"
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Catalogo de Servicos",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "x-internal-api-key",
+								"value": "{{internalApiKey}}"
+							}
+						],
+						"url": {
+							"raw": "{{url}}/internal/catalogo/servicos",
+							"host": [
+								"{{url}}"
+							],
+							"path": [
+								"internal",
+								"catalogo",
+								"servicos"
+							]
+						},
+						"auth": {
+							"type": "noauth"
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Catalogo de Insumos",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "x-internal-api-key",
+								"value": "{{internalApiKey}}"
+							}
+						],
+						"url": {
+							"raw": "{{url}}/internal/catalogo/insumos",
+							"host": [
+								"{{url}}"
+							],
+							"path": [
+								"internal",
+								"catalogo",
+								"insumos"
 							]
 						},
 						"auth": {
