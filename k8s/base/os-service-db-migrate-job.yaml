@@ -2,7 +2,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: oficina-db-migrate
+  name: os-service-db-migrate
 spec:
   backoffLimit: 2
   ttlSecondsAfterFinished: 600
@@ -15,4 +15,4 @@ spec:
           command: ["npx", "prisma", "migrate", "deploy"]
           envFrom:
             - secretRef:
-                name: oficina-secrets
+                name: os-service-secrets

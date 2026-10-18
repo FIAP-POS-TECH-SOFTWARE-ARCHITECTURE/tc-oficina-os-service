@@ -1,15 +1,15 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: oficina-api
+  name: os-service
   labels:
-    app: oficina-api
+    app: os-service
 spec:
   # LoadBalancer para cloud (EKS). No minikube: usar `minikube tunnel` OU
-  # trocar para NodePort / usar `minikube service oficina-api` (ver k8s/README.md).
+  # `minikube service os-service` (ver k8s/README.md).
   type: LoadBalancer
   selector:
-    app: oficina-api
+    app: os-service
   ports:
     - port: 80
       targetPort: 3000

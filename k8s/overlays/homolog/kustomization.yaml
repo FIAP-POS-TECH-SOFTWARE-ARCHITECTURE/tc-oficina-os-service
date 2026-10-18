@@ -6,12 +6,12 @@ resources:
 # A pipeline (cd.yml) substitui os dois placeholders pelo repositório do ECR e pela
 # tag do build (env-sha) antes do `kubectl apply -k`.
 images:
-  - name: oficina-api
+  - name: os-service
     newName: ci-placeholder-image
     newTag: ci-placeholder-tag
 patches:
   - patch: |-
       - op: add
         path: /spec/template/spec/containers/0/env/-
-        value: { name: NEW_RELIC_APP_NAME, value: oficina-api-homolog }
-    target: { kind: Deployment, name: oficina-api }
+        value: { name: NEW_RELIC_APP_NAME, value: oficina-os-service-homolog }
+    target: { kind: Deployment, name: os-service }

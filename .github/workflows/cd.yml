@@ -4,9 +4,14 @@ on:
   push:
     branches: [develop, main]
   workflow_dispatch:
+    inputs:
+      limpar_legado:
+        description: "Remover os recursos K8s legados (oficina-api, oficina-config, oficina-secrets...) do ambiente depois do deploy"
+        type: boolean
+        default: false
 
 concurrency:
-  group: cd-app-${{ github.ref_name }}
+  group: cd-os-service-${{ github.ref_name }}
   cancel-in-progress: false
 
 jobs:
@@ -34,7 +39,7 @@ jobs:
       - name: Build e push da imagem
         id: meta
         run: |
-          IMAGE="${{ steps.ecr.outputs.registry }}/oficina-api:${{ steps.env.outputs.environment }}-${{ github.sha }}"
+          IMAGE="${{ steps.ecr.outputs.registry }}/oficina-os-service:${{ steps.env.outputs.environment }}-${{ github.sha }}"
           docker build -t "$IMAGE" .
           docker push "$IMAGE"
           echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
@@ -47,20 +52,35 @@ jobs:
           ENV=${{ steps.env.outputs.environment }}
           DATABASE_URL=$(aws ssm get-parameter --name "/oficina/$ENV/database-url" --with-decryption --query Parameter.Value --output text)
           JWT_SECRET=$(aws ssm get-parameter --name "/oficina/$ENV/jwt-secret" --with-decryption --query Parameter.Value --output text)
-          kubectl create secret generic oficina-secrets -n "$ENV" \
-            --from-literal=DATABASE_URL="$DATABASE_URL" \
-            --from-literal=JWT_SECRET="$JWT_SECRET" \
-            --from-literal=NEW_RELIC_LICENSE_KEY="${{ secrets.NEW_RELIC_LICENSE_KEY }}" \
-            --from-literal=ADMIN_BOOTSTRAP_EMAIL="${{ secrets.ADMIN_BOOTSTRAP_EMAIL }}" \
-            --from-literal=ADMIN_BOOTSTRAP_PASSWORD="${{ secrets.ADMIN_BOOTSTRAP_PASSWORD }}" \
+          INTERNAL_API_KEY=$(aws ssm get-parameter --name "/oficina/$ENV/internal-api-key" --with-decryption --query Parameter.Value --output text)
+          ARGS=(
+            --from-literal=DATABASE_URL="$DATABASE_URL"
+            --from-literal=JWT_SECRET="$JWT_SECRET"
+            --from-literal=INTERNAL_API_KEY="$INTERNAL_API_KEY"
+            --from-literal=NEW_RELIC_LICENSE_KEY="${{ secrets.NEW_RELIC_LICENSE_KEY }}"
+            --from-literal=ADMIN_BOOTSTRAP_EMAIL="${{ secrets.ADMIN_BOOTSTRAP_EMAIL }}"
+            --from-literal=ADMIN_BOOTSTRAP_PASSWORD="${{ secrets.ADMIN_BOOTSTRAP_PASSWORD }}"
+          )
+          # Mensageria: incluída quando a infra de mensageria já existir no ambiente.
+          for PAR in \
+            "SNS_EVENTOS_ARN=mensageria/eventos-topic-arn" \
+            "SQS_EXECUCAO_COMANDOS_URL=mensageria/execucao-comandos-url" \
+            "SQS_BILLING_COMANDOS_URL=mensageria/billing-comandos-url" \
+            "SQS_OS_ORQUESTRADOR_EVENTOS_URL=mensageria/os-orquestrador-eventos-url"; do
+            NOME="${PAR%%=*}"
+            CAMINHO="/oficina/$ENV/${PAR#*=}"
+            VALOR=$(aws ssm get-parameter --name "$CAMINHO" --query Parameter.Value --output text 2>/dev/null || true)
+            if [ -n "$VALOR" ]; then ARGS+=(--from-literal="$NOME=$VALOR"); else echo "::warning::$CAMINHO ausente; $NOME fora do Secret"; fi
+          done
+          kubectl create secret generic os-service-secrets -n "$ENV" "${ARGS[@]}" \
             --dry-run=client -o yaml | kubectl apply -n "$ENV" -f -
 
       - name: Migrações do banco
         run: |
           ENV=${{ steps.env.outputs.environment }}
-          kubectl delete job oficina-db-migrate -n "$ENV" --ignore-not-found
-          sed "s|PLACEHOLDER_IMAGE|${{ steps.meta.outputs.image }}|" k8s/base/db-migrate-job.yaml | kubectl apply -n "$ENV" -f -
-          kubectl wait --for=condition=complete job/oficina-db-migrate -n "$ENV" --timeout=300s
+          kubectl delete job os-service-db-migrate -n "$ENV" --ignore-not-found
+          sed "s|PLACEHOLDER_IMAGE|${{ steps.meta.outputs.image }}|" k8s/base/os-service-db-migrate-job.yaml | kubectl apply -n "$ENV" -f -
+          kubectl wait --for=condition=complete job/os-service-db-migrate -n "$ENV" --timeout=300s
 
       - name: Aplicar manifests (kustomize) com a imagem do build
         run: |
@@ -70,14 +90,15 @@ jobs:
           TAG="${IMAGE##*:}"
           sed -i "s|ci-placeholder-image|$REPO|; s|ci-placeholder-tag|$TAG|" "k8s/overlays/$ENV/kustomization.yaml"
           kubectl apply -k "k8s/overlays/$ENV"
-          kubectl rollout status deployment/oficina-api -n "$ENV" --timeout=300s
+          kubectl rollout status deployment/os-service -n "$ENV" --timeout=300s
 
       - name: Smoke test e publicação do hostname
+        id: smoke
         run: |
           ENV=${{ steps.env.outputs.environment }}
           URL=""
           for i in $(seq 1 30); do
-            HOST=$(kubectl get svc oficina-api -n "$ENV" -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' || true)
+            HOST=$(kubectl get svc os-service -n "$ENV" -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' || true)
             if [ -n "$HOST" ] && curl -fsS "http://$HOST/health" > /dev/null; then
               URL="$HOST"
               break
@@ -85,6 +106,26 @@ jobs:
             [ "$i" = "30" ] && { echo "health check falhou (hostname='$HOST')"; exit 1; }
             sleep 10
           done
-          aws ssm put-parameter --name "/oficina/$ENV/app-lb-hostname" \
-            --value "$URL" --type String --overwrite
+          aws ssm put-parameter --name "/oficina/$ENV/os-service-lb-hostname" --value "$URL" --type String --overwrite
+          # Escrita dupla até o gateway ler o nome novo; removida depois que a borda migrar.
+          aws ssm put-parameter --name "/oficina/$ENV/app-lb-hostname" --value "$URL" --type String --overwrite
+          echo "hostname=$URL" >> "$GITHUB_OUTPUT"
           echo "Ambiente $ENV disponível em http://$URL"
+
+      - name: Remover recursos legados (sob demanda)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.limpar_legado }}
+        run: |
+          ENV=${{ steps.env.outputs.environment }}
+          NOVO="${{ steps.smoke.outputs.hostname }}"
+          curl -fsS "http://$NOVO/health" > /dev/null
+          # O API Gateway (tc-oficina-lambda-auth, API "oficina-api-<env>") precisa já apontar para o LB novo e não mais para o legado.
+          ANTIGO=$(kubectl get svc oficina-api -n "$ENV" -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)
+          API_ID=$(aws apigatewayv2 get-apis --query "Items[?Name=='oficina-api-$ENV'].ApiId" --output text)
+          [ -n "$API_ID" ] || { echo "API oficina-api-$ENV não encontrada"; exit 1; }
+          URIS=$(aws apigatewayv2 get-integrations --api-id "$API_ID" --query "Items[].IntegrationUri" --output text | tr '\t' '\n')
+          echo "$URIS" | grep -q "$NOVO" || { echo "gateway ainda não aponta para $NOVO: reaplicar o tc-oficina-lambda-auth"; exit 1; }
+          if [ -n "$ANTIGO" ] && echo "$URIS" | grep -q "$ANTIGO"; then echo "gateway ainda usa o LB legado $ANTIGO"; exit 1; fi
+          kubectl delete deployment/oficina-api service/oficina-api hpa/oficina-api-hpa \
+            configmap/oficina-config secret/oficina-secrets job/oficina-db-migrate \
+            -n "$ENV" --ignore-not-found
+          kubectl get deploy,svc,hpa,cm,secret -n "$ENV" | grep -E "oficina-api|oficina-config|oficina-secrets" && exit 1 || echo "legado removido de $ENV"

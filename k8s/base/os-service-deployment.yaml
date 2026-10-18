@@ -1,24 +1,24 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: oficina-api
+  name: os-service
   labels:
-    app: oficina-api
+    app: os-service
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: oficina-api
+      app: os-service
   template:
     metadata:
       labels:
-        app: oficina-api
+        app: os-service
     spec:
       containers:
-        - name: oficina-api
-          # placeholder: a pipeline troca via `kubectl set image`.
+        - name: os-service
+          # placeholder: a pipeline troca pela imagem do ECR (overlay kustomize).
           # No minikube usa-se a imagem construída localmente (ver k8s/README.md).
-          image: oficina-api:local
+          image: os-service:local
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 3000
@@ -31,9 +31,9 @@ spec:
               value: "true"
           envFrom:
             - configMapRef:
-                name: oficina-config
+                name: os-service-config
             - secretRef:
-                name: oficina-secrets
+                name: os-service-secrets
           resources:
             requests:
               cpu: 100m
