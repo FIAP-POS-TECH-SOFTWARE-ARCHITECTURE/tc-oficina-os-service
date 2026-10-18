@@ -3,7 +3,7 @@ import { CancelarOsUseCase } from "./cancelar-os.use-case";
 
 const gateway = {
 	buscarDetalhePorId: jest.fn(),
-	executarCancelamento: jest.fn(),
+	executarCancelamento: jest.fn().mockResolvedValue(true),
 };
 const notificador = { notificarMudancaStatus: jest.fn() };
 
@@ -48,6 +48,13 @@ describe("CancelarOsUseCase", () => {
 		gateway.buscarDetalhePorId.mockResolvedValue(osMock({ status: OsStatus.FINALIZADA }));
 		expect((await makeSut().execute("os1", "u1", {})).status).toBe(422);
 		expect(gateway.executarCancelamento).not.toHaveBeenCalled();
+	});
+
+	it("422 quando o status mudou antes do lock (gateway recusa o cancelamento)", async () => {
+		gateway.buscarDetalhePorId.mockResolvedValue(osMock({ status: OsStatus.EM_EXECUCAO }));
+		gateway.executarCancelamento.mockResolvedValueOnce(false);
+		expect((await makeSut().execute("os1", "u1", {})).status).toBe(422);
+		expect(notificador.notificarMudancaStatus).not.toHaveBeenCalled();
 	});
 
 	it("falha no e-mail não impede o cancelamento", async () => {

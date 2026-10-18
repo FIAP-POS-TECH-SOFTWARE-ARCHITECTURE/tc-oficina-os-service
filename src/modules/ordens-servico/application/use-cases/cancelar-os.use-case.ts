@@ -21,7 +21,8 @@ export class CancelarOsUseCase {
 		if (!canTransition(os.status, "cancelar"))
 			return SR.unprocessableEntity(undefined, `Não é possível cancelar a OS no status ${os.status}`);
 
-		await this.gateway.executarCancelamento(os, usuarioId, dto.motivo);
+		const cancelada = await this.gateway.executarCancelamento(os, usuarioId, dto.motivo);
+		if (!cancelada) return SR.unprocessableEntity(undefined, "A OS mudou de status e não pode mais ser cancelada");
 
 		const detalhe = await this.gateway.buscarDetalhePorId(id);
 		try {

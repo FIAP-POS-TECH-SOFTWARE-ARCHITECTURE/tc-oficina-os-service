@@ -33,6 +33,6 @@ export interface OrdensServicoGatewayPort {
 	transicionarComHistorico(t: TransicaoPersistencia): Promise<void>;
 
 	// Atômico: o estorno do saldo de estoque da OS e a mudança para CANCELADA
-	// acontecem na mesma transação.
-	executarCancelamento(os: OsDetalhe, usuarioId: string | null, motivo: string | null | undefined): Promise<void>;
+	// acontecem na mesma transação. false quando o status relido sob lock já não permite cancelar.
+	executarCancelamento(os: OsDetalhe, usuarioId: string | null, motivo: string | null | undefined): Promise<boolean>;
 }

@@ -72,7 +72,8 @@ describe("RegistrosCompraPrismaGateway", () => {
 		const tx = {
 			insumo: {
 				findUnique: jest.fn().mockResolvedValue({ id: "i1", quantidadeEstoque: 6 }),
-				update: jest.fn(),
+				// saldo mudou depois da leitura (reserva concorrente): o update atômico devolve o valor real
+				update: jest.fn().mockResolvedValue({ id: "i1", quantidadeEstoque: 7 }),
 			},
 			movimentoEstoque: { create: jest.fn() },
 			registroCompra: { update: jest.fn() },
@@ -94,14 +95,14 @@ describe("RegistrosCompraPrismaGateway", () => {
 			},
 		});
 
-		expect(tx.insumo.update).toHaveBeenCalledWith({ where: { id: "i1" }, data: { quantidadeEstoque: 10 } });
+		expect(tx.insumo.update).toHaveBeenCalledWith({ where: { id: "i1" }, data: { quantidadeEstoque: { increment: 4 } } });
 		expect(tx.movimentoEstoque.create).toHaveBeenCalledWith(
 			expect.objectContaining({
 				data: expect.objectContaining({
 					tipo: TipoMovimentoEstoque.ENTRADA,
 					quantidade: 4,
-					quantidadeAnterior: 6,
-					quantidadePosterior: 10,
+					quantidadeAnterior: 3,
+					quantidadePosterior: 7,
 				}),
 			}),
 		);

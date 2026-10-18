@@ -8,6 +8,7 @@ function baseTx() {
 	return {
 		ordemServico: { create: jest.fn(), update: jest.fn(), findUnique: jest.fn().mockResolvedValue({ numero: "OS-2026-000001" }) },
 		osHistoricoStatus: { create: jest.fn(), findFirst: jest.fn().mockResolvedValue(null) },
+		$queryRaw: jest.fn().mockResolvedValue([{ status: PrismaOsStatus.RECEBIDA }]),
 	};
 }
 
@@ -18,6 +19,7 @@ describe("OrdensServicoPrismaGateway", () => {
 	const reserva = { reservar: jest.fn(), estornar: jest.fn().mockResolvedValue({ insumosEstornados: 0 }) };
 
 	beforeEach(() => {
+		jest.clearAllMocks();
 		logSpy = jest.spyOn(Logger.prototype, "log").mockImplementation(() => undefined);
 		prisma = {
 			ordemServico: {
@@ -265,6 +267,28 @@ describe("OrdensServicoPrismaGateway", () => {
 		});
 		expect(tx.osHistoricoStatus.create).toHaveBeenCalledWith({
 			data: expect.objectContaining({ statusNovo: PrismaOsStatus.CANCELADA, observacao: "cliente desistiu", usuarioId: "u1" }),
+		});
+	});
+
+	it("executarCancelamento relê o status sob lock: OS que virou FINALIZADA não é cancelada nem estornada", async () => {
+		const tx = baseTx();
+		tx.$queryRaw.mockResolvedValueOnce([{ status: PrismaOsStatus.FINALIZADA }]);
+		prisma.$transaction.mockImplementationOnce(async (fn: any) => fn(tx));
+
+		await expect(gateway.executarCancelamento(osDetalhe({ status: OsStatus.EM_EXECUCAO }), "u1", null)).resolves.toBe(false);
+		expect(reserva.estornar).not.toHaveBeenCalled();
+		expect(tx.ordemServico.update).not.toHaveBeenCalled();
+		expect(tx.osHistoricoStatus.create).not.toHaveBeenCalled();
+	});
+
+	it("executarCancelamento usa o status relido sob lock como statusAnterior", async () => {
+		const tx = baseTx();
+		tx.$queryRaw.mockResolvedValueOnce([{ status: PrismaOsStatus.EM_EXECUCAO }]);
+		prisma.$transaction.mockImplementationOnce(async (fn: any) => fn(tx));
+
+		await expect(gateway.executarCancelamento(osDetalhe({ status: OsStatus.AGUARDANDO_PAGAMENTO }), "u1", null)).resolves.toBe(true);
+		expect(tx.osHistoricoStatus.create).toHaveBeenCalledWith({
+			data: expect.objectContaining({ statusAnterior: PrismaOsStatus.EM_EXECUCAO, statusNovo: PrismaOsStatus.CANCELADA }),
 		});
 	});
 

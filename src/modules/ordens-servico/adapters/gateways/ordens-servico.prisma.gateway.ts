@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger } from "@nestjs/common";
 import { OsStatus as PrismaOsStatus, Prisma } from "@prisma/client";
 import { PrismaService } from "../../../../prisma/prisma.service";
 import { RESERVA_ESTOQUE_OS, type ReservaEstoqueOsPort } from "../../../insumos/application/ports/reserva-estoque-os.gateway";
+import { canTransition } from "../../domain/fluxo-estados-os";
 import { OsStatus } from "../../domain/os-status";
 import { OrdensServicoGatewayPort, TransicaoPersistencia } from "../../application/ports/ordens-servico.gateway";
 import { HistoricoItemApp, OsChaveOrdenacao, OsDetalhe, OsResumo, TempoMedioServicoApp } from "../../application/ports/os-types";
@@ -145,18 +146,26 @@ export class OrdensServicoPrismaGateway implements OrdensServicoGatewayPort {
 		});
 	}
 
-	async executarCancelamento(os: OsDetalhe, usuarioId: string | null, motivo: string | null | undefined): Promise<void> {
-		await this.prisma.$transaction(async (tx) => {
+	// Relê o status com a linha travada: o caso de uso validou sobre uma leitura anterior, e um
+	// cancelamento ou finalização concorrente pode ter mudado a OS nesse meio-tempo.
+	async executarCancelamento(os: OsDetalhe, usuarioId: string | null, motivo: string | null | undefined): Promise<boolean> {
+		return this.prisma.$transaction(async (tx) => {
+			const [atual] = await tx.$queryRaw<
+				{ status: PrismaOsStatus }[]
+			>`SELECT status FROM ordens_servico WHERE id = ${os.id}::uuid FOR UPDATE`;
+			if (!atual || !canTransition(atual.status as unknown as OsStatus, "cancelar")) return false;
+
 			await this.reservaEstoque.estornar({ ordemServicoId: os.id, motivo: "Estorno por cancelamento de OS", usuarioId }, tx);
 			await tx.ordemServico.update({ where: { id: os.id }, data: { status: PrismaOsStatus.CANCELADA, canceladoEm: new Date() } });
 			await registrarTransicaoOs(tx, this.logger, {
 				ordemServicoId: os.id,
 				numero: os.numero,
-				statusAnterior: os.status,
+				statusAnterior: atual.status,
 				statusNovo: PrismaOsStatus.CANCELADA,
 				observacao: motivo ?? "OS cancelada",
 				usuarioId: usuarioId ?? undefined,
 			});
+			return true;
 		});
 	}
 }
