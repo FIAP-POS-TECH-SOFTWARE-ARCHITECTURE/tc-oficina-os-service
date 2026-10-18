@@ -2,12 +2,14 @@ import { Module } from "@nestjs/common";
 import { FornecedorStubGateway } from "./adapters/gateways/fornecedor-stub.gateway";
 import { InsumosPrismaGateway } from "./adapters/gateways/insumos.prisma.gateway";
 import { RegistrosCompraPrismaGateway } from "./adapters/gateways/registros-compra.prisma.gateway";
+import { ReservaEstoqueOsPrismaGateway } from "./adapters/gateways/reserva-estoque-os.prisma.gateway";
 import { InsumosController } from "./adapters/insumos.controller";
 import { InternalCatalogoInsumosController } from "./adapters/internal-catalogo-insumos.controller";
 import { RegistrosCompraController } from "./adapters/registros-compra.controller";
 import { FORNECEDOR } from "./application/ports/fornecedor.gateway";
 import { INSUMOS_GATEWAY } from "./application/ports/insumos.gateway";
 import { REGISTROS_COMPRA_GATEWAY } from "./application/ports/registros-compra.gateway";
+import { RESERVA_ESTOQUE_OS } from "./application/ports/reserva-estoque-os.gateway";
 import { AjustarEstoqueInsumoUseCase } from "./application/use-cases/ajustar-estoque-insumo.use-case";
 import { AlertasEstoqueBaixoUseCase } from "./application/use-cases/alertas-estoque-baixo.use-case";
 import { AtualizarInsumoUseCase } from "./application/use-cases/atualizar-insumo.use-case";
@@ -53,7 +55,8 @@ const useCases = [
 		{ provide: INSUMOS_GATEWAY, useClass: InsumosPrismaGateway },
 		{ provide: REGISTROS_COMPRA_GATEWAY, useClass: RegistrosCompraPrismaGateway },
 		{ provide: FORNECEDOR, useClass: FornecedorStubGateway },
+		{ provide: RESERVA_ESTOQUE_OS, useClass: ReservaEstoqueOsPrismaGateway },
 	],
-	exports: [INSUMOS_GATEWAY],
+	exports: [INSUMOS_GATEWAY, RESERVA_ESTOQUE_OS],
 })
 export class InsumosModule {}

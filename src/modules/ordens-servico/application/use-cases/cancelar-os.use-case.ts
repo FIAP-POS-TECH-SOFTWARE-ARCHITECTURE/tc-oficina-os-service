@@ -2,7 +2,6 @@ import { Inject, Injectable, Logger } from "@nestjs/common";
 import type { IServiceResponse } from "semantic-response";
 import { SR } from "../../../../common/utils/service-response.util";
 import { canTransition, nextStatus } from "../../domain/fluxo-estados-os";
-import { OsStatus } from "../../domain/os-status";
 import { NOTIFICADOR, type NotificadorPort } from "../ports/notificador.gateway";
 import { ORDENS_SERVICO_GATEWAY, type OrdensServicoGatewayPort } from "../ports/ordens-servico.gateway";
 
@@ -22,8 +21,7 @@ export class CancelarOsUseCase {
 		if (!canTransition(os.status, "cancelar"))
 			return SR.unprocessableEntity(undefined, `Não é possível cancelar a OS no status ${os.status}`);
 
-		const estornarEstoque = !!os.aprovadoEm && os.status !== OsStatus.BLOQUEADA;
-		await this.gateway.executarCancelamento(os, usuarioId, dto.motivo, estornarEstoque);
+		await this.gateway.executarCancelamento(os, usuarioId, dto.motivo);
 
 		const detalhe = await this.gateway.buscarDetalhePorId(id);
 		try {

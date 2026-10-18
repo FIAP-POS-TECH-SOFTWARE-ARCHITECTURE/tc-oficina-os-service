@@ -9,14 +9,6 @@ export class CancelarOsDto {
 	motivo?: string;
 }
 
-export class AprovacaoPublicaDto {
-	@ApiProperty({ example: "Pode iniciar o serviço", required: false })
-	@IsOptional()
-	@IsString()
-	@MaxLength(255)
-	observacao?: string;
-}
-
 export class DesbloquearOsDto {
 	@ApiProperty({ example: "Insumos chegaram", required: false })
 	@IsOptional()
