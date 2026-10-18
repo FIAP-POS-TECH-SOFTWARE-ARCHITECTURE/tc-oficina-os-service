@@ -1,5 +1,7 @@
 import { INestApplication } from "@nestjs/common";
 import request from "supertest";
+import { OsStatus } from "../../src/modules/ordens-servico/domain/os-status";
+import { PrismaService } from "../../src/prisma/prisma.service";
 import { bearer } from "./auth";
 import { expectStatus } from "./assertions";
 
@@ -138,4 +140,9 @@ export async function createOS(app: INestApplication, token: string, clienteId: 
 	const res = await request(app.getHttpServer()).post("/os").set("Authorization", bearer(token)).send({ clienteId, veiculoId });
 	expectStatus(res, 201);
 	return res.body.data;
+}
+
+// Leva a OS direto ao status desejado: as transições intermediárias são disparadas pelos outros serviços.
+export async function forcarStatusOs(prisma: PrismaService, osId: string, status: OsStatus): Promise<void> {
+	await prisma.ordemServico.update({ where: { id: osId }, data: { status } });
 }
