@@ -3,6 +3,7 @@ import { FornecedorStubGateway } from "./adapters/gateways/fornecedor-stub.gatew
 import { InsumosPrismaGateway } from "./adapters/gateways/insumos.prisma.gateway";
 import { RegistrosCompraPrismaGateway } from "./adapters/gateways/registros-compra.prisma.gateway";
 import { InsumosController } from "./adapters/insumos.controller";
+import { InternalCatalogoInsumosController } from "./adapters/internal-catalogo-insumos.controller";
 import { RegistrosCompraController } from "./adapters/registros-compra.controller";
 import { FORNECEDOR } from "./application/ports/fornecedor.gateway";
 import { INSUMOS_GATEWAY } from "./application/ports/insumos.gateway";
@@ -17,6 +18,7 @@ import { CriarInsumoUseCase } from "./application/use-cases/criar-insumo.use-cas
 import { CriarRegistroCompraUseCase } from "./application/use-cases/criar-registro-compra.use-case";
 import { EnviarFornecedorUseCase } from "./application/use-cases/enviar-fornecedor.use-case";
 import { InativarInsumoUseCase } from "./application/use-cases/inativar-insumo.use-case";
+import { ListarCatalogoInsumosUseCase } from "./application/use-cases/listar-catalogo-insumos.use-case";
 import { ListarInsumosUseCase } from "./application/use-cases/listar-insumos.use-case";
 import { ListarMovimentosInsumoUseCase } from "./application/use-cases/listar-movimentos-insumo.use-case";
 import { ListarRegistrosCompraUseCase } from "./application/use-cases/listar-registros-compra.use-case";
@@ -41,10 +43,11 @@ const useCases = [
 	RegistrarRespostaFornecedorUseCase,
 	CancelarRegistroCompraUseCase,
 	ReceberCompraUseCase,
+	ListarCatalogoInsumosUseCase,
 ];
 
 @Module({
-	controllers: [RegistrosCompraController, InsumosController],
+	controllers: [RegistrosCompraController, InsumosController, InternalCatalogoInsumosController],
 	providers: [
 		...useCases,
 		{ provide: INSUMOS_GATEWAY, useClass: InsumosPrismaGateway },
