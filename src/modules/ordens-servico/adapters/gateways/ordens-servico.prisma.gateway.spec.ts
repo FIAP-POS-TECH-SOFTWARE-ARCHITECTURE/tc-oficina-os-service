@@ -103,6 +103,59 @@ describe("OrdensServicoPrismaGateway", () => {
 		expect(prisma.ordemServico.findMany).not.toHaveBeenCalled();
 	});
 
+	it.each([
+		["ativos", "s.ativo = true"],
+		["inativos", "s.ativo = false"],
+	] as const)("tempoMedioPorServico(%s) filtra", async (filtro, trecho) => {
+		prisma.$queryRaw.mockResolvedValueOnce([]);
+		await gateway.tempoMedioPorServico(filtro);
+		expect(JSON.stringify(prisma.$queryRaw.mock.calls[0])).toContain(trecho);
+	});
+
+	it("tempoMedioPorServico(ambos) não filtra por ativo", async () => {
+		prisma.$queryRaw.mockResolvedValueOnce([]);
+		await gateway.tempoMedioPorServico("ambos");
+		expect(JSON.stringify(prisma.$queryRaw.mock.calls[0])).not.toContain("s.ativo =");
+	});
+
+	it("listarParaOrdenacao sem filtros não restringe nada", async () => {
+		prisma.ordemServico.findMany.mockResolvedValueOnce([]);
+		await gateway.listarParaOrdenacao({});
+		expect(prisma.ordemServico.findMany).toHaveBeenCalledWith({ where: {}, select: { id: true, status: true, createdAt: true } });
+	});
+
+	it("buscarPorId busca a OS sem relações", async () => {
+		prisma.ordemServico.findUnique.mockResolvedValueOnce(null);
+		await expect(gateway.buscarPorId("os1")).resolves.toBeNull();
+		expect(prisma.ordemServico.findUnique).toHaveBeenCalledWith({ where: { id: "os1" } });
+	});
+
+	it("buscarPorNumero busca pelo número com include completo", async () => {
+		prisma.ordemServico.findUnique.mockResolvedValueOnce({ id: "os1" });
+		await gateway.buscarPorNumero("OS-2026-000001");
+		expect(prisma.ordemServico.findUnique).toHaveBeenCalledWith(
+			expect.objectContaining({ where: { numero: "OS-2026-000001" }, include: expect.any(Object) }),
+		);
+	});
+
+	it("listarHistorico ordena do mais antigo ao mais novo com o usuário", async () => {
+		prisma.osHistoricoStatus.findMany.mockResolvedValueOnce([]);
+		await gateway.listarHistorico("os1");
+		expect(prisma.osHistoricoStatus.findMany).toHaveBeenCalledWith({
+			where: { ordemServicoId: "os1" },
+			include: { usuario: true },
+			orderBy: { createdAt: "asc" },
+		});
+	});
+
+	it("contarPorAno conta só as OS criadas dentro do ano", async () => {
+		prisma.ordemServico.count.mockResolvedValueOnce(7);
+		await expect(gateway.contarPorAno(2026)).resolves.toBe(7);
+		expect(prisma.ordemServico.count).toHaveBeenCalledWith({
+			where: { createdAt: { gte: new Date("2026-01-01T00:00:00Z"), lt: new Date("2027-01-01T00:00:00Z") } },
+		});
+	});
+
 	it("listarParaOrdenacao aplica notIn quando recebe excluirStatus", async () => {
 		prisma.ordemServico.findMany.mockResolvedValueOnce([]);
 		await gateway.listarParaOrdenacao({ excluirStatus: [OsStatus.FINALIZADA, OsStatus.ENTREGUE] });
