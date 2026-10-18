@@ -69,13 +69,13 @@ export class RegistrosCompraPrismaGateway implements RegistrosCompraGatewayPort 
 			const insumo = await tx.insumo.findUnique({ where: { id: dados.insumoId } });
 			if (!insumo) throw new Error(`Insumo ${dados.insumoId} não encontrado`);
 
-			const anterior = insumo.quantidadeEstoque;
-			const posterior = anterior + dados.quantidade;
-
-			await tx.insumo.update({
+			// Soma atômica: uma reserva concorrente pode ter mudado o saldo depois da leitura acima.
+			const atualizado = await tx.insumo.update({
 				where: { id: insumo.id },
-				data: { quantidadeEstoque: posterior },
+				data: { quantidadeEstoque: { increment: dados.quantidade } },
 			});
+			const posterior = atualizado.quantidadeEstoque;
+			const anterior = posterior - dados.quantidade;
 
 			await tx.movimentoEstoque.create({
 				data: {

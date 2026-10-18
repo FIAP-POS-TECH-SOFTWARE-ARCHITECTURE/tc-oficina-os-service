@@ -3,7 +3,7 @@ import { CancelarOsUseCase } from "./cancelar-os.use-case";
 
 const gateway = {
 	buscarDetalhePorId: jest.fn(),
-	executarCancelamento: jest.fn(),
+	executarCancelamento: jest.fn().mockResolvedValue(true),
 };
 const notificador = { notificarMudancaStatus: jest.fn() };
 
@@ -34,26 +34,33 @@ describe("CancelarOsUseCase", () => {
 		expect((await makeSut().execute("os1", "u1", {})).status).toBe(422);
 	});
 
-	it("cancela com estorno quando aprovada e não bloqueada", async () => {
-		const os = osMock();
-		gateway.buscarDetalhePorId.mockResolvedValue(os);
-		const res = await makeSut().execute("os1", "u1", { motivo: "x" });
-		expect(res.status).toBe(200);
-		expect(gateway.executarCancelamento).toHaveBeenCalledWith(os, "u1", "x", true);
+	it.each([OsStatus.RECEBIDA, OsStatus.BLOQUEADA, OsStatus.AGUARDANDO_PAGAMENTO, OsStatus.EM_EXECUCAO])(
+		"cancela em %s delegando o estorno ao gateway (saldo líquido decide)",
+		async (status) => {
+			const os = osMock({ status });
+			gateway.buscarDetalhePorId.mockResolvedValue(os);
+			expect((await makeSut().execute("os1", "u1", { motivo: "x" })).status).toBe(200);
+			expect(gateway.executarCancelamento).toHaveBeenCalledWith(os, "u1", "x");
+		},
+	);
+
+	it("422 em FINALIZADA", async () => {
+		gateway.buscarDetalhePorId.mockResolvedValue(osMock({ status: OsStatus.FINALIZADA }));
+		expect((await makeSut().execute("os1", "u1", {})).status).toBe(422);
+		expect(gateway.executarCancelamento).not.toHaveBeenCalled();
 	});
 
-	it("cancela sem estorno quando não aprovada", async () => {
-		const os = osMock({ aprovadoEm: null, status: OsStatus.RECEBIDA });
-		gateway.buscarDetalhePorId.mockResolvedValue(os);
-		await makeSut().execute("os1", "u1", {});
-		expect(gateway.executarCancelamento).toHaveBeenCalledWith(os, "u1", undefined, false);
+	it("422 quando o status mudou antes do lock (gateway recusa o cancelamento)", async () => {
+		gateway.buscarDetalhePorId.mockResolvedValue(osMock({ status: OsStatus.EM_EXECUCAO }));
+		gateway.executarCancelamento.mockResolvedValueOnce(false);
+		expect((await makeSut().execute("os1", "u1", {})).status).toBe(422);
+		expect(notificador.notificarMudancaStatus).not.toHaveBeenCalled();
 	});
 
-	it("cancela sem estorno quando bloqueada", async () => {
-		const os = osMock({ status: OsStatus.BLOQUEADA });
-		gateway.buscarDetalhePorId.mockResolvedValue(os);
-		await makeSut().execute("os1", "u1", {});
-		expect(gateway.executarCancelamento).toHaveBeenCalledWith(os, "u1", undefined, false);
+	it("falha no e-mail não impede o cancelamento", async () => {
+		gateway.buscarDetalhePorId.mockResolvedValue(osMock());
+		notificador.notificarMudancaStatus.mockRejectedValueOnce(new Error("smtp fora"));
+		expect((await makeSut().execute("os1", "u1", {})).status).toBe(200);
 	});
 
 	it("notifica CANCELADA", async () => {

@@ -1,4 +1,4 @@
-# Kubernetes - Oficina API
+# Kubernetes - OS service
 
 Manifestos de deploy da aplicação, organizados com **Kustomize**: `k8s/base/` tem os
 recursos comuns e `k8s/overlays/<env>/` os ajustes por ambiente (`homolog`, `prod`).
@@ -10,18 +10,18 @@ provedor real.
 
 | Arquivo | Recurso | Observação |
 |---|---|---|
-| `base/app-configmap.yaml` | ConfigMap `oficina-config` | Config **não sensível** (PORT, JWT_EXPIRES_IN, SMTP_HOST/PORT/FROM) |
-| `base/app-deployment.yaml` | Deployment `oficina-api` | 2 réplicas, probes, `resources.requests/limits`, env do agente New Relic (`NODE_OPTIONS=-r newrelic`) |
-| `base/app-service.yaml` | Service `oficina-api` | `LoadBalancer` (EKS) / `minikube service` (local) |
-| `base/app-hpa.yaml` | HPA `oficina-api-hpa` | CPU 70%, 2→10 réplicas (`autoscaling/v2`) |
-| `base/db-migrate-job.yaml` | Job `oficina-db-migrate` | Migração Prisma; **fora do kustomize**, aplicado pelo pipeline por ambiente |
+| `base/os-service-configmap.yaml` | ConfigMap `os-service-config` | Config **não sensível** (PORT, JWT_EXPIRES_IN, SMTP_HOST/PORT/FROM) |
+| `base/os-service-deployment.yaml` | Deployment `os-service` | 2 réplicas, probes, `resources.requests/limits`, env do agente New Relic (`NODE_OPTIONS=-r newrelic`) |
+| `base/os-service-service.yaml` | Service `os-service` | `LoadBalancer` (EKS) / `minikube service` (local) |
+| `base/os-service-hpa.yaml` | HPA `os-service-hpa` | CPU 70%, 2→10 réplicas (`autoscaling/v2`) |
+| `base/os-service-db-migrate-job.yaml` | Job `os-service-db-migrate` | Migração Prisma; **fora do kustomize**, aplicado pelo pipeline por ambiente |
 | `base/kustomization.yaml` | — | Lista os recursos da base (sem o Job) |
-| `overlays/homolog/kustomization.yaml` | — | `namespace: homolog`, `NEW_RELIC_APP_NAME=oficina-api-homolog` |
-| `overlays/prod/kustomization.yaml` | — | `namespace: prod`, `NEW_RELIC_APP_NAME=oficina-api-prod` |
+| `overlays/homolog/kustomization.yaml` | — | `namespace: homolog`, `NEW_RELIC_APP_NAME=oficina-os-service-homolog` |
+| `overlays/prod/kustomization.yaml` | — | `namespace: prod`, `NEW_RELIC_APP_NAME=oficina-os-service-prod` |
 | `local/postgres.yaml` | Postgres + PVC + Service | **Só minikube** |
 | `local/mailhog.yaml` | Mailhog + Service | **Só minikube** |
 
-> O Secret `oficina-secrets` (DATABASE_URL, JWT_SECRET, NEW_RELIC_LICENSE_KEY, credenciais
+> O Secret `os-service-secrets` (DATABASE_URL, JWT_SECRET, INTERNAL_API_KEY, NEW_RELIC_LICENSE_KEY, credenciais
 > SMTP/admin) **não** está versionado: é criado via `kubectl` (abaixo, para o minikube) ou
 > pelo pipeline de CD (homolog/prod). NÃO commitar valores reais.
 
@@ -42,15 +42,16 @@ minikube addons enable metrics-server   # OBRIGATÓRIO: sem ele o HPA fica <unkn
 
 ```bash
 # 1. Construir a imagem DENTRO do minikube (o Deployment usa imagePullPolicy: IfNotPresent)
-minikube image build -t oficina-api:local .
+minikube image build -t os-service:local .
 
 # 2. Dependências locais (banco + mailhog)
 kubectl apply -f k8s/local/
 
 # 3. Secret (NUNCA commitado; DATABASE_URL aponta para o Service `postgres` interno)
-kubectl create secret generic oficina-secrets \
+kubectl create secret generic os-service-secrets \
   --from-literal=DATABASE_URL='postgresql://postgres:password@postgres:5432/oficina' \
   --from-literal=JWT_SECRET='dev-secret' \
+  --from-literal=INTERNAL_API_KEY='dev-internal-key' \
   --from-literal=ADMIN_BOOTSTRAP_EMAIL='admin@oficina.local' \
   --from-literal=ADMIN_BOOTSTRAP_PASSWORD='ChangeMe!123' \
   --from-literal=SMTP_USER='' \
@@ -70,8 +71,8 @@ kubectl get hpa            # TARGETS deve sair de <unknown> e mostrar % de CPU
 ## Acesso à aplicação (minikube)
 
 ```bash
-minikube service oficina-api --url     # imprime a URL (ex.: http://127.0.0.1:PORTA)
-curl $(minikube service oficina-api --url)/health   # {"status":200,...,"data":{"status":"ok"}}
+minikube service os-service --url     # imprime a URL (ex.: http://127.0.0.1:PORTA)
+curl $(minikube service os-service --url)/health   # {"status":200,...,"data":{"status":"ok"}}
 ```
 
 Alternativa: `minikube tunnel` (em outro terminal) para que o Service `LoadBalancer`
@@ -83,7 +84,7 @@ receba um EXTERNAL-IP acessível.
 |---|---|---|
 | Banco | `k8s/local/postgres.yaml` (Service `postgres`) | RDS via Terraform; `DATABASE_URL` no Secret aponta para o endpoint do RDS |
 | SMTP | Mailhog (`k8s/local/mailhog.yaml`) | Provedor real; `SMTP_HOST` sobrescrito no ConfigMap |
-| Imagem | `oficina-api:local` construída no minikube | Imagem do ECR; a pipeline injeta repo+tag no overlay (placeholders `ci-placeholder-image`/`ci-placeholder-tag`) antes do `kubectl apply -k` |
+| Imagem | `os-service:local` construída no minikube | Imagem do ECR; a pipeline injeta repo+tag no overlay (placeholders `ci-placeholder-image`/`ci-placeholder-tag`) antes do `kubectl apply -k` |
 | Service | `minikube service` / `tunnel` | `LoadBalancer` com ELB real |
 | Métricas p/ HPA | addon `metrics-server` | metrics-server **não vem por padrão no EKS**: instalar manualmente (ver repositório `tc-oficina-infra-k8s`) |
 
@@ -93,7 +94,7 @@ receba um EXTERNAL-IP acessível.
   - Minikube: habilitar o addon (`minikube addons enable metrics-server`) e aguardar ~30s.
   - EKS: metrics-server **não vem instalado por padrão**, ver a documentação do repositório `tc-oficina-infra-k8s`.
   - O HPA exige `resources.requests.cpu` no Deployment (já configurado).
-- **Pod em `ImagePullBackOff`** → a imagem `oficina-api:local` não existe no minikube. Rode o
+- **Pod em `ImagePullBackOff`** → a imagem `os-service:local` não existe no minikube. Rode o
   `minikube image build` (passo 1). `imagePullPolicy: IfNotPresent` impede busca em registry.
 - **Pod em `CrashLoopBackOff` no boot** → checar `kubectl logs <pod>`; geralmente `DATABASE_URL`
   incorreta no Secret (deve usar o host `postgres`, não `localhost`).
@@ -105,10 +106,10 @@ de rate limit) para elevar a CPU acima de 70% e disparar o autoscaling.
 
 ```bash
 # terminal 1: acompanhar o HPA escalar:
-kubectl get hpa oficina-api-hpa -w
+kubectl get hpa os-service-hpa -w
 
 # terminal 2: disparar a carga:
-k6 run -e BASE_URL=$(minikube service oficina-api --url) k6/load-test.js
+k6 run -e BASE_URL=$(minikube service os-service --url) k6/load-test.js
 ```
 
 Esperado: a coluna `REPLICAS` do HPA sobe de 2 conforme a CPU passa de 70% (até no máx. 10),

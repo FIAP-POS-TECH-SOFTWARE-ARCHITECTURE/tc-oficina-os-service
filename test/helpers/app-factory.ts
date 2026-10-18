@@ -6,6 +6,7 @@ import { AppModule } from "../../src/app.module";
 import { AllExceptionsFilter } from "../../src/common/filters/all-exceptions.filter";
 import { JwtAuthGuard } from "../../src/common/guards/jwt-auth.guard";
 import { RolesGuard } from "../../src/common/guards/roles.guard";
+import { configurarRoteamento } from "../../src/common/http/roteamento";
 import { ResponseInterceptor } from "../../src/common/interceptors/response.interceptor";
 import { PrismaService } from "../../src/prisma/prisma.service";
 
@@ -13,6 +14,7 @@ export async function setupApp(): Promise<INestApplication> {
 	const moduleFixture = await Test.createTestingModule({ imports: [AppModule] }).compile();
 
 	const app = moduleFixture.createNestApplication();
+	configurarRoteamento(app);
 
 	app.useGlobalPipes(
 		new ValidationPipe({

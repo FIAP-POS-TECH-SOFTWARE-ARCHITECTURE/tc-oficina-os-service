@@ -1,0 +1,21 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: os-service-hpa
+  labels:
+    app: os-service
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: os-service
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          # equivalente ao `targetCPUUtilizationPercentage: 70` do autoscaling/v1 das aulas
+          type: Utilization
+          averageUtilization: 70

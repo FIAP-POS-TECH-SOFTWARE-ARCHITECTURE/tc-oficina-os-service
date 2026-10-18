@@ -1,5 +1,5 @@
 {
-	"name": "oficina-api",
+	"name": "oficina-os-service",
 	"version": "1.0.0",
 	"description": "",
 	"author": "",
@@ -126,13 +126,13 @@
 		"coverageThreshold": {
 			"global": {
 				"statements": 80,
-				"branches": 70,
+				"branches": 80,
 				"functions": 80,
 				"lines": 80
 			},
 			"src/modules/ordens-servico/application/**/*.ts": {
 				"statements": 80,
-				"branches": 70,
+				"branches": 80,
 				"functions": 80,
 				"lines": 80
 			},
@@ -144,7 +144,7 @@
 			},
 			"src/modules/auth/application/**/*.ts": {
 				"statements": 80,
-				"branches": 70,
+				"branches": 80,
 				"functions": 80,
 				"lines": 80
 			}

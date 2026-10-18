@@ -11,7 +11,6 @@ vars:
   insumoId: ""
   osId: ""
   osNumero: ""
-  itemServicoId: ""
-  itemInsumoId: ""
   documentoCliente: ""
   registroCompraId: ""
+  internalApiKey: "dev-internal-key"
