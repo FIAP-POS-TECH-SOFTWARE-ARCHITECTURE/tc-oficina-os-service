@@ -79,6 +79,13 @@ describe("Rotas internas (e2e)", () => {
 		expect(res.body.data).toEqual([{ id: ativo.id, nome: "Alinhamento", descricao: null, precoCentavos: 1999, tempoEstimadoMin: 30 }]);
 	});
 
+	it("variação de caixa no path não alcança o controller interno", async () => {
+		const maiusculo = await request(app.getHttpServer()).get("/INTERNAL/catalogo/servicos").set("x-internal-api-key", CHAVE);
+		expect(maiusculo.status).toBe(404);
+		const misto = await request(app.getHttpServer()).get("/internal/Catalogo/servicos").set("x-internal-api-key", CHAVE);
+		expect(misto.status).toBe(404);
+	});
+
 	it("GET /internal/catalogo/insumos → precoCentavos e quantidadeEstoque", async () => {
 		const insumo = await createInsumo(app, adminToken, {
 			codigo: "OL-5W30",

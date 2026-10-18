@@ -12,6 +12,7 @@ import { RolesGuard } from "./common/guards/roles.guard";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { PrismaService } from "./prisma/prisma.service";
 import { deveIgnorarRateLimit } from "./common/http/rate-limit";
+import { configurarRoteamento } from "./common/http/roteamento";
 import { INTERNAL_API_KEY_HEADER, INTERNAL_API_KEY_SECURITY } from "./common/guards/internal-api-key.guard";
 
 async function bootstrap() {
@@ -21,6 +22,7 @@ async function bootstrap() {
 	if (!process.env.INTERNAL_API_KEY) throw new Error("INTERNAL_API_KEY não definido no .env");
 
 	const app = await NestFactory.create(AppModule, { bufferLogs: true });
+	configurarRoteamento(app);
 	app.useLogger(app.get(Logger));
 
 	app.enableCors();
