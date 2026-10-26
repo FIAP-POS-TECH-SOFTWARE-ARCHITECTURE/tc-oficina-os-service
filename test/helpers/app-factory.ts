@@ -14,6 +14,7 @@ export async function setupApp(): Promise<INestApplication> {
 	const moduleFixture = await Test.createTestingModule({ imports: [AppModule] }).compile();
 
 	const app = moduleFixture.createNestApplication();
+	app.enableShutdownHooks();
 	configurarRoteamento(app);
 
 	app.useGlobalPipes(

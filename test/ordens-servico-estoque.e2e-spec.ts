@@ -49,6 +49,8 @@ describe("Ordens de Serviço (e2e) - estoque por OS", () => {
 		const { insumo, os } = await osComInsumo(10);
 		expect((await reservar(os.id, insumo.id, 4)).reservado).toBe(true);
 		expect(await estoqueDe(insumo.id)).toBe(6);
+		// OS aberta antes do orquestrador (sem fluxo): o cancelamento local estorna o saldo
+		await prisma.fluxoOrdemServico.delete({ where: { osId: os.id } });
 		const res = await request(app.getHttpServer())
 			.post(`/os/${os.id}/cancelar`)
 			.set("Authorization", bearer(adminToken))
