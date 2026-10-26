@@ -8,7 +8,7 @@ Os arquivos deste diretório são a referência normativa — nenhum serviço po
 
 ## 1. Topologia de mensageria
 
-Recursos por ambiente, com `<env>` ∈ `homolog` | `prod`.
+Recursos por ambiente, com `<env>` ∈ `homolog` | `prod` | `local`.
 
 | Nome físico | Tipo | Produtor | Consumidor | DLQ |
 | --- | --- | --- | --- | --- |
@@ -29,6 +29,8 @@ Configuração (idêntica na infraestrutura e no emulador local):
 | Assinatura SNS → `os-orquestrador-eventos` | `RawMessageDelivery=true`, `FilterPolicy={"origem":["billing","execution"]}` (escopo `MessageAttributes`) |
 
 Consumo: long polling, lote de até 10, **apagar a mensagem só depois** de processar e commitar. Erro durante o processamento não apaga a mensagem — ela volta após o visibility timeout e, na quinta falha, vai para a DLQ.
+
+Ambiente `local` (desenvolvimento e testes manuais, só no emulador do `dev/docker-compose.yml`; não existe na AWS): os mesmos nomes com `<env>=local` — `oficina-local-execucao-comandos`, `oficina-local-billing-comandos`, `oficina-local-os-orquestrador-eventos` (cada uma com sua `-dlq`) e o tópico `oficina-local-eventos`, com os atributos e a assinatura da tabela acima. O script `scripts/mensageria-local.cjs` do os-service cria tudo (`npm run ministack:up && npm run mensageria:local`) e imprime as quatro variáveis de mensageria da seção 6. Billing e execution podem reutilizar o mesmo script e os mesmos nomes.
 
 ## 2. Envelope e atributos
 
@@ -65,11 +67,19 @@ Dinheiro é sempre **centavos inteiros** (campos `...Centavos`). Nunca float nem
 1. `messageId` já processado → apagar a mensagem, sem nenhum efeito e sem nenhum evento.
 2. `messageId` novo mas ação já aplicada no domínio (por exemplo `CancelarOrcamento` em orçamento já cancelado) → registrar o `messageId` e **re-emitir o evento de resultado** (`OrcamentoCancelado`), para o orquestrador conseguir avançar.
 3. O registro do `messageId` e o efeito de domínio acontecem na **mesma transação** (Postgres) ou no mesmo `TransactWriteItems` (DynamoDB).
-4. **A ordem não é garantida** (SQS Standard): `CancelarExecucao` pode chegar antes de `SolicitarDiagnostico` ou `IniciarReparo`, e `CancelarOrcamento` antes de `GerarOrcamento`. O participante registra o cancelamento por `fluxoId` (marca o fluxo como cancelado antecipadamente), reemite `ExecucaoCancelada` / `OrcamentoCancelado` e, quando o comando de criação chegar depois, não cria nada e reemite o evento de cancelado.
+4. **A ordem não é garantida** (SQS Standard): `CancelarExecucao` pode chegar antes de `SolicitarDiagnostico` ou `IniciarReparo`, e `CancelarOrcamento` antes de `GerarOrcamento`. O participante registra o cancelamento por `fluxoId` (marca o fluxo como cancelado antecipadamente), reemite `ExecucaoCancelada` / `OrcamentoCancelado` e, quando o comando de criação chegar depois, não cria nada e reemite o evento de cancelado. Nesse caso `OrcamentoCancelado` sai com `orcamentoId: null`.
+5. **Reenvios e compensações do orquestrador** que os participantes precisam suportar:
+   - Compensação sem resposta (`CancelarExecucao`, `CancelarOrcamento`, `EstornarPagamento`) é reenviada a cada `PRAZO_RESPOSTA_SERVICO` com `messageId` **novo**, até três vezes; depois o fluxo vai para `FALHA_TECNICA`. Pela regra 2, o participante reemite o evento de resultado.
+   - Se o execution não confirma `SolicitarDiagnostico` (`ExecucaoEnfileirada`) no prazo, recebe `CancelarExecucao` — o comando pode ter chegado depois do prazo.
+   - Se o billing não responde `GerarOrcamento` no prazo, recebe `CancelarOrcamento`, para que um orçamento gerado tarde não fique aprovável.
+   - `ExecucaoEnfileirada` que chega com o fluxo já encerrado (`COMPENSADO` ou `CONCLUIDO`) recebe `CancelarExecucao` com `messageId` novo.
+   - `PagamentoConfirmado` antes da aprovação, ou depois de o fluxo ter compensado, recebe `EstornarPagamento`. Com o mesmo `pagamentoId` já registrado no fluxo, é ignorado; com outro `pagamentoId` depois do pagamento do fluxo, o orquestrador não estorna sozinho (gera alerta para decisão humana).
 
 ## 3. Catálogo de mensagens
 
 A lista normativa está em `tipos.json`, usada pelo teste de completude. Cada tipo tem um schema em `schemas/payloads/<Tipo>.schema.json` e um exemplo válido em `exemplos/<Tipo>.json`.
+
+Proposta para a versão 2 (ainda não implementada): `pagamentoId` opcional em `EstornarPagamento`, para o orquestrador poder estornar automaticamente um segundo pagamento do mesmo orçamento. Na versão 1, `EstornarPagamento` não identifica qual pagamento estornar, e esse caso fica como alerta.
 
 ### 3.1 Comandos para o execution-service
 
@@ -189,9 +199,13 @@ Roteamento no gateway: as três rotas `/billing/cliente/...` são explícitas e 
 
 | Rota | Resposta |
 | --- | --- |
-| `GET /orquestracao/fluxos/:osId` | `200` com o fluxo, suas etapas e compensações |
+| `GET /orquestracao/fluxos/:osId` | `200` com `{ fluxo, mensagens }`: `fluxo` traz etapa, status, prazos e compensações pendentes e feitas; `mensagens` traz os comandos e eventos do outbox (`messageId`, `tipo`, `destino`, `status`, `tentativas`, `createdAt`, `enviadaEm`); `404` sem fluxo |
 | `POST /orquestracao/fluxos/:fluxoId/reprocessar` | `200`; `422` se o status não for `FALHA_TECNICA`. Reenvia o comando pendente com `messageId` **novo**: o antigo pode ter sido processado com o evento perdido, e com id novo a regra 2 de idempotência faz o consumidor reemitir o resultado |
-| `POST /orquestracao/fluxos/:fluxoId/compensar` | `200`; `422` se o status não for `FALHA_TECNICA` |
+| `POST /orquestracao/fluxos/:fluxoId/compensar`, corpo opcional `{ "motivo"?: string }` (até 255) | `200`; `422` se o status não for `FALHA_TECNICA` |
+
+**os-service** (staff com role `ATENDENTE` ou `ADMINISTRADOR`): `POST /os/:id/desbloquear`, corpo opcional `{ "observacao"?: string }`, tenta de novo a reserva de estoque de uma OS `BLOQUEADA` e, havendo estoque, retoma o fluxo pedindo `GerarOrcamento`. Responde `200` com a OS; `422` com os insumos faltantes ou se a OS não estiver bloqueada por estoque; `404` quando inexistente.
+
+`correlationId` da cadeia: é o identificador da requisição no os-service, que vem do header `x-request-id` repassado pelo API Gateway (gerado quando ausente). Todas as mensagens de um mesmo fluxo carregam esse valor.
 
 **Formato de resposta**, igual nos três serviços. Toda resposta usa o mesmo envelope, de sucesso ou de erro, e o código HTTP aparece tanto no status da resposta quanto no campo `status` do corpo:
 
@@ -237,6 +251,8 @@ Variáveis de ambiente dos pods, preenchidas a partir do SSM durante o deploy.
 | `AWS_REGION` | ✔ | ✔ | ✔ | fixo `us-east-1` |
 | `SQS_DLQ_URLS` | ✔ | — | — | CSV das três URLs `/oficina/<env>/mensageria/*-dlq-url` |
 | `AWS_ENDPOINT_URL` | local | local | local | apenas em desenvolvimento e teste: `http://localhost:4566`. O SDK v3 lê nativamente; **nunca** é definida em homolog ou prod |
+| `PRAZO_APROVACAO`, `PRAZO_PAGAMENTO`, `PRAZO_RESPOSTA_SERVICO` | ✔ | — | — | ConfigMap do os-service, não SSM. Minutos inteiros maiores que zero; padrão 4320 / 2880 / 10, homolog 30 / 30 / 5. Valor inválido impede o processo de subir |
+| `WORKERS_HABILITADOS` | ✔ | opcional | opcional | não definida em homolog e prod (padrão: ligado). `false` desliga consumidor de fila, relay de outbox e jobs; usada em testes. Billing e execution podem adotar o mesmo nome para o mesmo fim |
 
 As DLQs também são publicadas no SSM, para observabilidade e reprocessamento: `/oficina/<env>/mensageria/execucao-comandos-dlq-url`, `/oficina/<env>/mensageria/billing-comandos-dlq-url` e `/oficina/<env>/mensageria/os-orquestrador-eventos-dlq-url`.
 
@@ -258,3 +274,12 @@ contratos/
 Os exemplos contam a história de uma mesma ordem de serviço (`OS-2026-000123`), com o mesmo `fluxoId` e `osId`, cobrindo o caminho feliz e os caminhos de compensação.
 
 Versionamento: `versao` do envelope é `1`. Uma mudança incompatível cria uma versão nova, e o consumidor aceita as duas até que todos os produtores tenham migrado.
+
+## 8. Eventos de log do orquestrador
+
+Valores do campo `event` nos logs JSON do os-service, usados pelos alertas e painéis de observabilidade. Todo log do orquestrador e da mensageria leva, quando existir, `fluxoId`, `osId` e `messageId`.
+
+| Tipo | Eventos |
+| --- | --- |
+| Alerta (nível `error`) | `fluxo.falha_tecnica`, `fluxo.compensacao_atrasada`, `fluxo.compensacao_travada`, `fluxo.estorno_falhou`, `fluxo.pagamento_atrasado`, `fluxo.pagamento_inesperado`, `fluxo.cancelamento_tardio`, `mensageria.mensagem_invalida`, `mensageria.falha_processamento`, `mensageria.falha_recebimento`, `outbox.falha_envio`, `outbox.falha_definitiva` |
+| Informativo | `fluxo.iniciado`, `fluxo.transicao`, `fluxo.evento_ignorado`, `fluxo.desconhecido`, `mensageria.duplicada`, `mensageria.origem_ignorada`, `mensageria.consumidor_iniciado` |
