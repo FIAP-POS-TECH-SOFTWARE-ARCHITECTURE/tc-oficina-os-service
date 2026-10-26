@@ -5,6 +5,9 @@ import { PrismaService } from "../../src/prisma/prisma.service";
 export async function truncateAll(prisma: PrismaService): Promise<void> {
 	await prisma.$executeRawUnsafe(`
 		TRUNCATE TABLE
+			"mensagens_processadas",
+			"outbox_mensagens",
+			"fluxos_ordem_servico",
 			"os_historico_status",
 			"os_itens_insumo",
 			"os_itens_servico",
