@@ -20,6 +20,7 @@
 		"sonar:scan": "bash scripts/sonar-quality-gate.sh",
 		"ministack:up": "docker compose -f dev/docker-compose.yml up -d ministack",
 		"ministack:down": "docker compose -f dev/docker-compose.yml stop ministack",
+		"mensageria:local": "node scripts/mensageria-local.cjs",
 		"test:integracao": "jest --config ./test/jest-integracao.json --runInBand",
 		"test": "jest",
 		"test:watch": "jest --watch",
