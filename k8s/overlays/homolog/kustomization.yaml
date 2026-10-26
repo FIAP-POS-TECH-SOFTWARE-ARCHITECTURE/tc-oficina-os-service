@@ -15,3 +15,14 @@ patches:
         path: /spec/template/spec/containers/0/env/-
         value: { name: NEW_RELIC_APP_NAME, value: oficina-os-service-homolog }
     target: { kind: Deployment, name: os-service }
+  - patch: |-
+      - op: replace
+        path: /data/PRAZO_APROVACAO
+        value: "30"
+      - op: replace
+        path: /data/PRAZO_PAGAMENTO
+        value: "30"
+      - op: replace
+        path: /data/PRAZO_RESPOSTA_SERVICO
+        value: "5"
+    target: { kind: ConfigMap, name: os-service-config }

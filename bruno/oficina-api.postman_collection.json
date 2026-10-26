@@ -52,6 +52,10 @@
 			"value": ""
 		},
 		{
+			"key": "fluxoId",
+			"value": ""
+		},
+		{
 			"key": "documentoCliente",
 			"value": ""
 		},
@@ -1248,6 +1252,39 @@
 						}
 					},
 					"response": []
+				},
+				{
+					"name": "Desbloquear OS",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{url}}/os/{{osId}}/desbloquear",
+							"host": [
+								"{{url}}"
+							],
+							"path": [
+								"os",
+								"{{osId}}",
+								"desbloquear"
+							]
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"observacao\": \"Estoque reposto\"\n  }",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": []
 				}
 			]
 		},
@@ -1545,6 +1582,84 @@
 						},
 						"auth": {
 							"type": "noauth"
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Orquestracao",
+			"item": [
+				{
+					"name": "Consultar Fluxo",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{url}}/orquestracao/fluxos/{{osId}}",
+							"host": [
+								"{{url}}"
+							],
+							"path": [
+								"orquestracao",
+								"fluxos",
+								"{{osId}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Reprocessar Fluxo",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{url}}/orquestracao/fluxos/{{fluxoId}}/reprocessar",
+							"host": [
+								"{{url}}"
+							],
+							"path": [
+								"orquestracao",
+								"fluxos",
+								"{{fluxoId}}",
+								"reprocessar"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Compensar Fluxo",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{url}}/orquestracao/fluxos/{{fluxoId}}/compensar",
+							"host": [
+								"{{url}}"
+							],
+							"path": [
+								"orquestracao",
+								"fluxos",
+								"{{fluxoId}}",
+								"compensar"
+							]
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"motivo\": \"Decisão do administrador\"\n  }",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
 						}
 					},
 					"response": []
