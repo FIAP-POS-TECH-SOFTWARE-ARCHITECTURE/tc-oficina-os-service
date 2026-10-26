@@ -1,0 +1,78 @@
+enum EtapaFluxoOs {
+  AGUARDANDO_ACK_DIAGNOSTICO
+  AGUARDANDO_DIAGNOSTICO
+  DIAGNOSTICO_EM_ANDAMENTO
+  AGUARDANDO_ESTOQUE
+  AGUARDANDO_ORCAMENTO
+  AGUARDANDO_APROVACAO
+  AGUARDANDO_PAGAMENTO
+  AGUARDANDO_ACK_REPARO
+  AGUARDANDO_REPARO
+  REPARO_EM_ANDAMENTO
+  FINALIZADO
+}
+
+enum StatusFluxoOs {
+  EM_ANDAMENTO
+  COMPENSANDO
+  CONCLUIDO
+  COMPENSADO
+  FALHA_TECNICA
+}
+
+enum StatusOutbox {
+  PENDENTE
+  ENVIADA
+  FALHA
+}
+
+model FluxoOrdemServico {
+  id                       String        @id @default(uuid()) @db.Uuid
+  osId                     String        @unique @map("os_id") @db.Uuid
+  etapa                    EtapaFluxoOs
+  status                   StatusFluxoOs @default(EM_ANDAMENTO)
+  prazoExpiraEm            DateTime?     @map("prazo_expira_em")
+  prazoAprovacaoEm         DateTime?     @map("prazo_aprovacao_em")
+  compensacoesPendentes    String[]      @default([]) @map("compensacoes_pendentes")
+  compensacoesFeitas       String[]      @default([]) @map("compensacoes_feitas")
+  motivoCompensacao        String?       @map("motivo_compensacao")
+  comandoPendenteMessageId String?       @map("comando_pendente_message_id") @db.Uuid
+  pagamentoId              String?       @map("pagamento_id")
+  correlationId            String        @map("correlation_id")
+  tentativas               Int           @default(0)
+  createdAt                DateTime      @default(now()) @map("created_at")
+  updatedAt                DateTime      @updatedAt @map("updated_at")
+
+  ordemServico OrdemServico @relation(fields: [osId], references: [id], onDelete: Cascade)
+
+  @@index([status, prazoExpiraEm])
+  @@index([etapa])
+  @@map("fluxos_ordem_servico")
+}
+
+model OutboxMensagem {
+  id                 String       @id @default(uuid()) @db.Uuid
+  messageId          String       @unique @map("message_id") @db.Uuid
+  fluxoId            String?      @map("fluxo_id") @db.Uuid
+  tipo               String
+  destino            String
+  corpo              Json
+  status             StatusOutbox @default(PENDENTE)
+  tentativas         Int          @default(0)
+  ultimoErro         String?      @map("ultimo_erro")
+  proximaTentativaEm DateTime     @default(now()) @map("proxima_tentativa_em")
+  enviadaEm          DateTime?    @map("enviada_em")
+  createdAt          DateTime     @default(now()) @map("created_at")
+
+  @@index([status, proximaTentativaEm])
+  @@index([fluxoId])
+  @@map("outbox_mensagens")
+}
+
+model MensagemProcessada {
+  messageId    String   @id @map("message_id") @db.Uuid
+  tipo         String
+  processadaEm DateTime @default(now()) @map("processada_em")
+
+  @@map("mensagens_processadas")
+}

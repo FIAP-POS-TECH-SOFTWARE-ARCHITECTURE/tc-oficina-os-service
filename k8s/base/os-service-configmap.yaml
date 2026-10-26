@@ -11,3 +11,6 @@ data:
   SMTP_PORT: "1025"
   SMTP_FROM: "oficina@localhost"
   AWS_REGION: "us-east-1"
+  PRAZO_APROVACAO: "4320"
+  PRAZO_PAGAMENTO: "2880"
+  PRAZO_RESPOSTA_SERVICO: "10"

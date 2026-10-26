@@ -1,5 +1,7 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from "@nestjs/common";
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, Req } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
+import type { Request } from "express";
+import { randomUUID } from "node:crypto";
 import { ApiEnvelopedResponse } from "../../../common/decorators/api-enveloped-response.decorator";
 import { ClienteAuth } from "../../../common/decorators/cliente-auth.decorator";
 import { CurrentCliente } from "../../../common/decorators/current-cliente.decorator";
@@ -13,12 +15,13 @@ import { ListarOsDto } from "../dto/listar-os.dto";
 import { MetricasTempoMedioDto } from "../dto/metricas-tempo-medio.dto";
 import { OsConsultaPublicaResponseDto, OsResponseDto } from "../dto/os-response.dto";
 import { TempoMedioServicoResponseDto } from "../dto/tempo-medio-servico-response.dto";
-import { CancelarOsDto } from "../dto/transicao.dto";
+import { CancelarOsDto, DesbloquearOsDto } from "../dto/transicao.dto";
 import { OsStatus } from "../domain/os-status";
 import { BuscarOsUseCase } from "../application/use-cases/buscar-os.use-case";
 import { CancelarOsUseCase } from "../application/use-cases/cancelar-os.use-case";
 import { ConsultaAcompanhamentoOsUseCase } from "../application/use-cases/consulta-publica-os.use-case";
 import { CriarOsUseCase } from "../application/use-cases/criar-os.use-case";
+import { DesbloquearOsUseCase } from "../application/use-cases/desbloquear-os.use-case";
 import { EntregarOsUseCase } from "../application/use-cases/entregar-os.use-case";
 import { HistoricoOsUseCase } from "../application/use-cases/historico-os.use-case";
 import { ListarOsUseCase } from "../application/use-cases/listar-os.use-case";
@@ -37,14 +40,15 @@ export class OrdensServicoController {
 		private readonly consultaAcompanhamentoOs: ConsultaAcompanhamentoOsUseCase,
 		private readonly entregarOs: EntregarOsUseCase,
 		private readonly cancelarOs: CancelarOsUseCase,
+		private readonly desbloquearOs: DesbloquearOsUseCase,
 	) {}
 
 	@Post()
 	@Roles(Role.ATENDENTE, Role.ADMINISTRADOR)
 	@ApiOperation({ summary: "Criar uma nova Ordem de Serviço" })
 	@ApiEnvelopedResponse(OsResponseDto, { status: 201 })
-	create(@Body() dto: CreateOsDto) {
-		return this.criarOs.execute(dto);
+	create(@Body() dto: CreateOsDto, @Req() req: Request & { id?: string }) {
+		return this.criarOs.execute(dto, String(req.id ?? randomUUID()));
 	}
 
 	@Get()
@@ -103,5 +107,13 @@ export class OrdensServicoController {
 	@ApiEnvelopedResponse(OsResponseDto)
 	cancelar(@Param("id", ParseUUIDPipe) id: string, @Body() dto: CancelarOsDto, @CurrentUser() user: AuthenticatedUser) {
 		return this.cancelarOs.execute(id, user.id, dto);
+	}
+
+	@Post(":id/desbloquear")
+	@Roles(Role.ATENDENTE, Role.ADMINISTRADOR)
+	@ApiOperation({ summary: "Retomar OS bloqueada por falta de estoque (nova tentativa de reserva)" })
+	@ApiEnvelopedResponse(OsResponseDto)
+	desbloquear(@Param("id", ParseUUIDPipe) id: string, @Body() _dto: DesbloquearOsDto, @CurrentUser() user: AuthenticatedUser) {
+		return this.desbloquearOs.execute(id, user.id);
 	}
 }

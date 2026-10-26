@@ -146,7 +146,6 @@ describe("Ordens de Serviço (e2e) - endpoints individuais", () => {
 		["POST", "/os/:id/orcamento/gerar"],
 		["POST", "/os/:id/diagnostico/iniciar"],
 		["POST", "/os/:id/finalizar"],
-		["POST", "/os/:id/desbloquear"],
 		["POST", "/os/:numero/orcamento/aprovar"],
 	])("%s %s não existe mais no OS → 404", async (_metodo, rota) => {
 		const { cliente, veiculo } = await setupClienteVeiculo();

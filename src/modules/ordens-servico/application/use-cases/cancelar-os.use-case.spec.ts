@@ -6,6 +6,7 @@ const gateway = {
 	executarCancelamento: jest.fn().mockResolvedValue(true),
 };
 const notificador = { notificarMudancaStatus: jest.fn() };
+const orquestrador = { cancelarPorStaff: jest.fn().mockResolvedValue({ encontrado: false }) };
 
 const osMock = (overrides: any = {}) => ({
 	id: "os1",
@@ -18,11 +19,14 @@ const osMock = (overrides: any = {}) => ({
 });
 
 function makeSut() {
-	return new CancelarOsUseCase(gateway as any, notificador);
+	return new CancelarOsUseCase(gateway as any, notificador, orquestrador as any);
 }
 
 describe("CancelarOsUseCase", () => {
-	beforeEach(() => jest.clearAllMocks());
+	beforeEach(() => {
+		jest.clearAllMocks();
+		orquestrador.cancelarPorStaff.mockResolvedValue({ encontrado: false });
+	});
 
 	it("404 quando OS não existe", async () => {
 		gateway.buscarDetalhePorId.mockResolvedValue(null);
@@ -69,5 +73,26 @@ describe("CancelarOsUseCase", () => {
 		expect(notificador.notificarMudancaStatus).toHaveBeenCalledWith(
 			expect.objectContaining({ statusNovo: OsStatus.CANCELADA, observacao: "cliente desistiu" }),
 		);
+	});
+
+	it("OS com fluxo: cancela pelo orquestrador (compensações) e não pelo gateway", async () => {
+		gateway.buscarDetalhePorId.mockResolvedValue(osMock({ status: OsStatus.AGUARDANDO_PAGAMENTO }));
+		orquestrador.cancelarPorStaff.mockResolvedValue({ encontrado: true, aplicado: true, motivo: "ok" });
+		expect((await makeSut().execute("os1", "u1", { motivo: "desistiu" })).status).toBe(200);
+		expect(orquestrador.cancelarPorStaff).toHaveBeenCalledWith("os1", "u1", "desistiu");
+		expect(gateway.executarCancelamento).not.toHaveBeenCalled();
+		expect(notificador.notificarMudancaStatus).not.toHaveBeenCalled(); // o orquestrador notifica
+	});
+
+	it("fluxo em compensação recusa com 422 e o motivo", async () => {
+		gateway.buscarDetalhePorId.mockResolvedValue(osMock({ status: OsStatus.EM_EXECUCAO }));
+		orquestrador.cancelarPorStaff.mockResolvedValue({
+			encontrado: true,
+			aplicado: false,
+			motivo: "CancelamentoSolicitado ignorado: fluxo em compensação",
+		});
+		const res = await makeSut().execute("os1", "u1", {});
+		expect(res.status).toBe(422);
+		expect(orquestrador.cancelarPorStaff).toHaveBeenCalledWith("os1", "u1", "Cancelada pela oficina");
 	});
 });

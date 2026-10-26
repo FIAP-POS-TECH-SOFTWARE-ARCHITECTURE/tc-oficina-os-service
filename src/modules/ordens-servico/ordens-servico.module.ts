@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { ClientesModule } from "../clientes/clientes.module";
 import { InsumosModule } from "../insumos/insumos.module";
+import { OrquestracaoOsModule } from "../orquestracao-os/orquestracao-os.module";
 import { VeiculosModule } from "../veiculos/veiculos.module";
 import { ClientesConsultaPrismaGateway, VeiculosConsultaPrismaGateway } from "./adapters/gateways/consultas-externas.prisma.gateway";
 import { SmtpNotificadorGateway } from "./adapters/gateways/notificador.smtp.gateway";
@@ -13,6 +14,7 @@ import { BuscarOsUseCase } from "./application/use-cases/buscar-os.use-case";
 import { CancelarOsUseCase } from "./application/use-cases/cancelar-os.use-case";
 import { ConsultaAcompanhamentoOsUseCase } from "./application/use-cases/consulta-publica-os.use-case";
 import { CriarOsUseCase } from "./application/use-cases/criar-os.use-case";
+import { DesbloquearOsUseCase } from "./application/use-cases/desbloquear-os.use-case";
 import { EntregarOsUseCase } from "./application/use-cases/entregar-os.use-case";
 import { HistoricoOsUseCase } from "./application/use-cases/historico-os.use-case";
 import { ListarOsUseCase } from "./application/use-cases/listar-os.use-case";
@@ -27,10 +29,11 @@ const useCases = [
 	ConsultaAcompanhamentoOsUseCase,
 	EntregarOsUseCase,
 	CancelarOsUseCase,
+	DesbloquearOsUseCase,
 ];
 
 @Module({
-	imports: [ClientesModule, VeiculosModule, InsumosModule],
+	imports: [ClientesModule, VeiculosModule, InsumosModule, OrquestracaoOsModule],
 	controllers: [OrdensServicoController],
 	providers: [
 		...useCases,

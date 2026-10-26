@@ -41,6 +41,7 @@ jobs:
         run: |
           IMAGE="${{ steps.ecr.outputs.registry }}/oficina-os-service:${{ steps.env.outputs.environment }}-${{ github.sha }}"
           docker build -t "$IMAGE" .
+          docker run --rm "$IMAGE" sh -c "node -e \"require('ajv');require('ajv-formats');require('@aws-sdk/client-sqs');require('@aws-sdk/client-sns')\" && test -f contratos/tipos.json"
           docker push "$IMAGE"
           echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
 
@@ -61,7 +62,7 @@ jobs:
             --from-literal=ADMIN_BOOTSTRAP_EMAIL="${{ secrets.ADMIN_BOOTSTRAP_EMAIL }}"
             --from-literal=ADMIN_BOOTSTRAP_PASSWORD="${{ secrets.ADMIN_BOOTSTRAP_PASSWORD }}"
           )
-          # Mensageria: incluída quando a infra de mensageria já existir no ambiente.
+          # Mensageria obrigatória: com os workers ligados o pod não sobe sem estas envs.
           for PAR in \
             "SNS_EVENTOS_ARN=mensageria/eventos-topic-arn" \
             "SQS_EXECUCAO_COMANDOS_URL=mensageria/execucao-comandos-url" \
@@ -70,7 +71,7 @@ jobs:
             NOME="${PAR%%=*}"
             CAMINHO="/oficina/$ENV/${PAR#*=}"
             VALOR=$(aws ssm get-parameter --name "$CAMINHO" --query Parameter.Value --output text 2>/dev/null || true)
-            if [ -n "$VALOR" ]; then ARGS+=(--from-literal="$NOME=$VALOR"); else echo "::warning::$CAMINHO ausente; $NOME fora do Secret"; fi
+            if [ -n "$VALOR" ]; then ARGS+=(--from-literal="$NOME=$VALOR"); else echo "::error::$CAMINHO ausente (infra de mensageria não aplicada no ambiente)"; exit 1; fi
           done
           kubectl create secret generic os-service-secrets -n "$ENV" "${ARGS[@]}" \
             --dry-run=client -o yaml | kubectl apply -n "$ENV" -f -
@@ -106,6 +107,9 @@ jobs:
             [ "$i" = "30" ] && { echo "health check falhou (hostname='$HOST')"; exit 1; }
             sleep 10
           done
+          # Logs capturados antes do grep: com pipefail, o grep -q fechando o pipe cedo derrubaria o kubectl (SIGPIPE).
+          LOGS=$(kubectl logs deployment/os-service -n "$ENV" --since=10m)
+          grep -q mensageria.consumidor_iniciado <<< "$LOGS" || { echo "consumidor não iniciou"; exit 1; }
           aws ssm put-parameter --name "/oficina/$ENV/os-service-lb-hostname" --value "$URL" --type String --overwrite
           # Escrita dupla até o gateway ler o nome novo; removida depois que a borda migrar.
           aws ssm put-parameter --name "/oficina/$ENV/app-lb-hostname" --value "$URL" --type String --overwrite

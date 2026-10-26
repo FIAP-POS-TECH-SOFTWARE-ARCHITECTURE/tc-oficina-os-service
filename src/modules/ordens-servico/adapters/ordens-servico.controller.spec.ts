@@ -13,6 +13,7 @@ const useCaseNames = [
 	"consultaPublicaOs",
 	"entregarOs",
 	"cancelarOs",
+	"desbloquearOs",
 ] as const;
 
 describe("OrdensServicoController", () => {
@@ -30,8 +31,8 @@ describe("OrdensServicoController", () => {
 
 	describe("delegação para use cases", () => {
 		it("create", async () => {
-			await controller.create({ clienteId: "c1", veiculoId: "v1" });
-			expect(ucs.criarOs.execute).toHaveBeenCalledWith({ clienteId: "c1", veiculoId: "v1" });
+			await controller.create({ clienteId: "c1", veiculoId: "v1" }, { id: "req-1" } as never);
+			expect(ucs.criarOs.execute).toHaveBeenCalledWith({ clienteId: "c1", veiculoId: "v1" }, "req-1");
 		});
 
 		it("list", async () => {
@@ -68,6 +69,11 @@ describe("OrdensServicoController", () => {
 			await controller.cancelar("os1", { motivo: "x" }, user);
 			expect(ucs.cancelarOs.execute).toHaveBeenCalledWith("os1", "u1", { motivo: "x" });
 		});
+
+		it("desbloquear passa user.id", async () => {
+			await controller.desbloquear("os1", { observacao: "x" }, user);
+			expect(ucs.desbloquearOs.execute).toHaveBeenCalledWith("os1", "u1");
+		});
 	});
 
 	describe("decorators críticos", () => {
@@ -87,12 +93,19 @@ describe("OrdensServicoController", () => {
 			expect(Reflect.getMetadata(ROLES_KEY, OrdensServicoController.prototype.cancelar)).toEqual([Role.ADMINISTRADOR]);
 		});
 
+		it("desbloquear exige ATENDENTE ou ADMINISTRADOR", () => {
+			expect(Reflect.getMetadata(ROLES_KEY, OrdensServicoController.prototype.desbloquear)).toEqual([
+				Role.ATENDENTE,
+				Role.ADMINISTRADOR,
+			]);
+		});
+
 		it("metricas exige ADMINISTRADOR", () => {
 			expect(Reflect.getMetadata(ROLES_KEY, OrdensServicoController.prototype.metricas)).toEqual([Role.ADMINISTRADOR]);
 		});
 
 		it("rotas migradas para billing/execution não existem mais", () => {
-			for (const m of ["gerarOrcamento", "aprovar", "rejeitar", "iniciarDiagnostico", "addItemServico", "finalizar", "desbloquear"])
+			for (const m of ["gerarOrcamento", "aprovar", "rejeitar", "iniciarDiagnostico", "addItemServico", "finalizar"])
 				expect((OrdensServicoController.prototype as unknown as Record<string, unknown>)[m]).toBeUndefined();
 		});
 	});
