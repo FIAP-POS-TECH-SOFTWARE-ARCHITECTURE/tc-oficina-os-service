@@ -57,6 +57,7 @@ model OutboxMensagem {
   tipo               String
   destino            String
   corpo              Json
+  cabecalhosTrace    Json?        @map("cabecalhos_trace")
   status             StatusOutbox @default(PENDENTE)
   tentativas         Int          @default(0)
   ultimoErro         String?      @map("ultimo_erro")

@@ -3,6 +3,7 @@ import { Interval } from "@nestjs/schedule";
 import { PrismaService } from "../../prisma/prisma.service";
 import { DestinoMensagem, workersHabilitados } from "./configuracao-mensageria";
 import { EnvelopeMensagem } from "./envelope";
+import { CabecalhosTrace } from "./trace";
 import { PUBLICADOR_MENSAGENS, type PublicadorMensagensPort } from "./publicador-mensagens.port";
 
 interface LinhaReivindicada {
@@ -11,6 +12,7 @@ interface LinhaReivindicada {
 	destino: DestinoMensagem;
 	corpo: EnvelopeMensagem<unknown>;
 	tentativas: number;
+	cabecalhos_trace: CabecalhosTrace | null;
 }
 
 @Injectable()
@@ -49,7 +51,7 @@ export class RelayOutbox {
 				LIMIT ${RelayOutbox.LOTE}
 				FOR UPDATE SKIP LOCKED
 			)
-			RETURNING id, message_id, destino, corpo, tentativas
+			RETURNING id, message_id, destino, corpo, tentativas, cabecalhos_trace
 		`;
 		for (const linha of linhas) await this.publicar(linha);
 		return linhas.length;
@@ -57,8 +59,10 @@ export class RelayOutbox {
 
 	private async publicar(linha: LinhaReivindicada): Promise<void> {
 		try {
-			if (linha.destino === "eventos") await this.publicador.publicarEvento(linha.corpo);
-			else await this.publicador.enviarComando(linha.destino, linha.corpo);
+			// Trace persistido no enfileiramento: não recapturar aqui (o relay roda fora da transação de origem).
+			const trace = linha.cabecalhos_trace ?? {};
+			if (linha.destino === "eventos") await this.publicador.publicarEvento(linha.corpo, trace);
+			else await this.publicador.enviarComando(linha.destino, linha.corpo, trace);
 			await this.prisma.outboxMensagem.update({
 				where: { id: linha.id },
 				data: { status: "ENVIADA", enviadaEm: new Date(), ultimoErro: null },

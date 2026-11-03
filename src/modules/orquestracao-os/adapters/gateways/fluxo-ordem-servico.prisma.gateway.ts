@@ -14,6 +14,7 @@ import {
 } from "../../../insumos/application/ports/reserva-estoque-os.gateway";
 import { DestinoMensagem } from "../../../mensageria/configuracao-mensageria";
 import { EnvelopeMensagem } from "../../../mensageria/envelope";
+import { capturarCabecalhosTrace } from "../../../mensageria/trace";
 import { NotificacaoMudancaStatus } from "../../../ordens-servico/application/ports/notificador.gateway";
 import { registrarTransicaoOs } from "../../../ordens-servico/adapters/gateways/historico-os.prisma";
 import { canTransition, nextStatus, OsTransition } from "../../../ordens-servico/domain/fluxo-estados-os";
@@ -338,6 +339,7 @@ export class TransacaoFluxoPrisma implements TransacaoFluxo {
 				tipo: envelope.tipo,
 				destino,
 				corpo: envelope as unknown as Prisma.InputJsonValue,
+				cabecalhosTrace: capturarCabecalhosTrace(),
 			},
 		});
 	}

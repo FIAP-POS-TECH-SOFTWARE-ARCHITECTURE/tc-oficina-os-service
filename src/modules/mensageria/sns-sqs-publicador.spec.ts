@@ -30,6 +30,16 @@ describe("SnsSqsPublicador", () => {
 		});
 	});
 
+	it("repassa o trace aos MessageAttributes de comando e evento", async () => {
+		const trace = { traceparent: "00-a-b-01" };
+		await publicador.enviarComando("billing-comandos", env("CancelarOrcamento"), trace);
+		await publicador.publicarEvento(env("FluxoConcluido"), trace);
+		const atributos = (c: { send: jest.Mock }) =>
+			(c.send.mock.calls[0][0] as { input: { MessageAttributes: object } }).input.MessageAttributes;
+		expect(atributos(sqs)).toHaveProperty("traceparent", { DataType: "String", StringValue: "00-a-b-01" });
+		expect(atributos(sns)).toHaveProperty("traceparent", { DataType: "String", StringValue: "00-a-b-01" });
+	});
+
 	it("publicarEvento publica no tópico", async () => {
 		const e = env("FluxoConcluido");
 		await publicador.publicarEvento(e);
