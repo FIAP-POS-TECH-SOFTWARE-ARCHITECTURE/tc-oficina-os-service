@@ -13,6 +13,7 @@ function fluxo(p: Partial<FluxoOrdemServico> = {}): FluxoOrdemServico {
 		numeroOs: "OS-2026-000123",
 		correlationId: "req-1",
 		comandoPendenteMessageId: null,
+		atualizadoEm: new Date(Date.now() - 5000),
 		etapa: E.AGUARDANDO_ACK_DIAGNOSTICO,
 		status: S.EM_ANDAMENTO,
 		prazoExpiraEm: null,
@@ -129,6 +130,15 @@ describe("OrquestradorOrdemServico", () => {
 			expect.objectContaining({ status: S.COMPENSANDO, compensacoesPendentes: ["CancelarOrcamento"] }),
 		);
 		expect(notificador.notificarMudancaStatus).toHaveBeenCalledWith(expect.objectContaining({ statusNovo: "CANCELADA" }));
+		expect(Logger.prototype.log).toHaveBeenCalledWith(
+			expect.objectContaining({
+				event: "fluxo.transicao",
+				etapaAnterior: "AGUARDANDO_APROVACAO",
+				status: "COMPENSANDO",
+				motivoCompensacao: expect.any(String),
+				duracaoEtapaMs: expect.any(Number),
+			}),
+		);
 	});
 
 	it("DiagnosticoConcluido só processa itens quando a etapa aceita", async () => {

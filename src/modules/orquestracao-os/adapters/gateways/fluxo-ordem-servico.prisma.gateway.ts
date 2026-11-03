@@ -46,6 +46,7 @@ function paraFluxo(linha: FluxoComNumero): FluxoOrdemServico {
 		numeroOs: linha.ordemServico.numero,
 		correlationId: linha.correlationId,
 		comandoPendenteMessageId: linha.comandoPendenteMessageId,
+		atualizadoEm: linha.updatedAt,
 		etapa: linha.etapa as unknown as EtapaFluxoOs,
 		status: linha.status as unknown as StatusFluxoOs,
 		prazoExpiraEm: linha.prazoExpiraEm,

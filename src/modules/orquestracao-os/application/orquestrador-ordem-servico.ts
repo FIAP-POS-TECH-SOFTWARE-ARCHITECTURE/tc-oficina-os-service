@@ -183,6 +183,8 @@ export class OrquestradorOrdemServico {
 			return [];
 		}
 
+		const etapaAnterior = fluxo.etapa;
+		const desde = fluxo.atualizadoEm.getTime();
 		Object.assign(fluxo, decisao.estado);
 		for (const acao of decisao.acoesLocais) {
 			if (acao.tipo === "ESTORNAR_RESERVA")
@@ -205,7 +207,18 @@ export class OrquestradorOrdemServico {
 			);
 		}
 		await tx.salvarFluxo(fluxo);
-		this.logger.log({ event: "fluxo.transicao", etapa: fluxo.etapa, status: fluxo.status, comandos: decisao.comandos, ...ids });
+		this.logger.log({
+			event: "fluxo.transicao",
+			etapaAnterior,
+			etapa: fluxo.etapa,
+			status: fluxo.status,
+			duracaoEtapaMs: Date.now() - desde,
+			motivoCompensacao:
+				fluxo.status === StatusFluxoOs.COMPENSANDO || fluxo.status === StatusFluxoOs.COMPENSADO ? fluxo.motivoCompensacao : undefined,
+			comandos: decisao.comandos,
+			numeroOs: fluxo.numeroOs,
+			...ids,
+		});
 		return notificacao ? [notificacao] : [];
 	}
 

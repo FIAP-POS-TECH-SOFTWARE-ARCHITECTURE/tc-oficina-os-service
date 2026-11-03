@@ -14,6 +14,7 @@ export interface FluxoOrdemServico extends EstadoFluxo {
 	numeroOs: string;
 	correlationId: string;
 	comandoPendenteMessageId: string | null;
+	atualizadoEm: Date; // última gravação do fluxo = instante da última mudança de etapa
 }
 
 export interface ItemDiagnostico {
