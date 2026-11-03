@@ -5,7 +5,7 @@
   "pages": [
     {
       "name": "Homolog",
-      "description": "Ambiente de homologação (namespace homolog / appName oficina-api-homolog).",
+      "description": "Ambiente de homologação (namespace homolog / appName oficina-os-service-homolog).",
       "widgets": [
         {
           "title": "OS criadas (30 dias)",
@@ -17,7 +17,7 @@
             "nrqlQueries": [
               {
                 "accountIds": [8421772],
-                "query": "SELECT count(*) AS 'OS criadas' FROM Log WHERE event = 'os.created' AND (entity.name = 'oficina-api-homolog' OR namespace_name = 'homolog') SINCE 30 days ago"
+                "query": "SELECT count(*) AS 'OS criadas' FROM Log WHERE event = 'os.created' AND (entity.name = 'oficina-os-service-homolog' OR (namespace_name = 'homolog' AND container_name = 'os-service')) SINCE 30 days ago"
               }
             ],
             "platformOptions": { "ignoreTimeRange": false },
@@ -35,7 +35,7 @@
             "nrqlQueries": [
               {
                 "accountIds": [8421772],
-                "query": "SELECT count(*) FROM Log WHERE event = 'os.created' AND (entity.name = 'oficina-api-homolog' OR namespace_name = 'homolog') SINCE 30 days ago TIMESERIES 1 day"
+                "query": "SELECT count(*) FROM Log WHERE event = 'os.created' AND (entity.name = 'oficina-os-service-homolog' OR (namespace_name = 'homolog' AND container_name = 'os-service')) SINCE 30 days ago TIMESERIES 1 day"
               }
             ],
             "platformOptions": { "ignoreTimeRange": false },
@@ -53,7 +53,7 @@
             "nrqlQueries": [
               {
                 "accountIds": [8421772],
-                "query": "SELECT average(numeric(durationMs)) / 60000 AS 'minutos' FROM Log WHERE event = 'os.status.changed' AND (entity.name = 'oficina-api-homolog' OR namespace_name = 'homolog') FACET fromStatus SINCE 7 days ago"
+                "query": "SELECT average(numeric(durationMs)) / 60000 AS 'minutos' FROM Log WHERE event = 'os.status.changed' AND (entity.name = 'oficina-os-service-homolog' OR (namespace_name = 'homolog' AND container_name = 'os-service')) FACET fromStatus SINCE 7 days ago"
               }
             ],
             "platformOptions": { "ignoreTimeRange": false }
@@ -70,7 +70,7 @@
             "nrqlQueries": [
               {
                 "accountIds": [8421772],
-                "query": "SELECT count(*) FROM Log WHERE event = 'os.status.changed' AND (entity.name = 'oficina-api-homolog' OR namespace_name = 'homolog') FACET toStatus SINCE 1 day ago"
+                "query": "SELECT count(*) FROM Log WHERE event = 'os.status.changed' AND (entity.name = 'oficina-os-service-homolog' OR (namespace_name = 'homolog' AND container_name = 'os-service')) FACET toStatus SINCE 1 day ago"
               }
             ],
             "platformOptions": { "ignoreTimeRange": false }
@@ -87,7 +87,7 @@
             "nrqlQueries": [
               {
                 "accountIds": [8421772],
-                "query": "SELECT count(*) FROM Log WHERE event = 'integration.error' AND (entity.name = 'oficina-api-homolog' OR namespace_name = 'homolog') FACET integration SINCE 7 days ago TIMESERIES"
+                "query": "SELECT count(*) FROM Log WHERE event = 'integration.error' AND (entity.name = 'oficina-os-service-homolog' OR (namespace_name = 'homolog' AND container_name = 'os-service')) FACET integration SINCE 7 days ago TIMESERIES"
               }
             ],
             "platformOptions": { "ignoreTimeRange": false },
@@ -105,7 +105,7 @@
             "nrqlQueries": [
               {
                 "accountIds": [8421772],
-                "query": "SELECT timestamp, integration, osNumero, error, requestId FROM Log WHERE event = 'integration.error' AND (entity.name = 'oficina-api-homolog' OR namespace_name = 'homolog') SINCE 7 days ago LIMIT 50"
+                "query": "SELECT timestamp, integration, osNumero, error, requestId FROM Log WHERE event = 'integration.error' AND (entity.name = 'oficina-os-service-homolog' OR (namespace_name = 'homolog' AND container_name = 'os-service')) SINCE 7 days ago LIMIT 50"
               }
             ],
             "platformOptions": { "ignoreTimeRange": false }
@@ -115,7 +115,7 @@
     },
     {
       "name": "Prod",
-      "description": "Ambiente de produção (namespace prod / appName oficina-api-prod).",
+      "description": "Ambiente de produção (namespace prod / appName oficina-os-service-prod).",
       "widgets": [
         {
           "title": "OS criadas (30 dias)",
@@ -127,7 +127,7 @@
             "nrqlQueries": [
               {
                 "accountIds": [8421772],
-                "query": "SELECT count(*) AS 'OS criadas' FROM Log WHERE event = 'os.created' AND (entity.name = 'oficina-api-prod' OR namespace_name = 'prod') SINCE 30 days ago"
+                "query": "SELECT count(*) AS 'OS criadas' FROM Log WHERE event = 'os.created' AND (entity.name = 'oficina-os-service-prod' OR (namespace_name = 'prod' AND container_name = 'os-service')) SINCE 30 days ago"
               }
             ],
             "platformOptions": { "ignoreTimeRange": false },
@@ -145,7 +145,7 @@
             "nrqlQueries": [
               {
                 "accountIds": [8421772],
-                "query": "SELECT count(*) FROM Log WHERE event = 'os.created' AND (entity.name = 'oficina-api-prod' OR namespace_name = 'prod') SINCE 30 days ago TIMESERIES 1 day"
+                "query": "SELECT count(*) FROM Log WHERE event = 'os.created' AND (entity.name = 'oficina-os-service-prod' OR (namespace_name = 'prod' AND container_name = 'os-service')) SINCE 30 days ago TIMESERIES 1 day"
               }
             ],
             "platformOptions": { "ignoreTimeRange": false },
@@ -163,7 +163,7 @@
             "nrqlQueries": [
               {
                 "accountIds": [8421772],
-                "query": "SELECT average(numeric(durationMs)) / 60000 AS 'minutos' FROM Log WHERE event = 'os.status.changed' AND (entity.name = 'oficina-api-prod' OR namespace_name = 'prod') FACET fromStatus SINCE 7 days ago"
+                "query": "SELECT average(numeric(durationMs)) / 60000 AS 'minutos' FROM Log WHERE event = 'os.status.changed' AND (entity.name = 'oficina-os-service-prod' OR (namespace_name = 'prod' AND container_name = 'os-service')) FACET fromStatus SINCE 7 days ago"
               }
             ],
             "platformOptions": { "ignoreTimeRange": false }
@@ -180,7 +180,7 @@
             "nrqlQueries": [
               {
                 "accountIds": [8421772],
-                "query": "SELECT count(*) FROM Log WHERE event = 'os.status.changed' AND (entity.name = 'oficina-api-prod' OR namespace_name = 'prod') FACET toStatus SINCE 1 day ago"
+                "query": "SELECT count(*) FROM Log WHERE event = 'os.status.changed' AND (entity.name = 'oficina-os-service-prod' OR (namespace_name = 'prod' AND container_name = 'os-service')) FACET toStatus SINCE 1 day ago"
               }
             ],
             "platformOptions": { "ignoreTimeRange": false }
@@ -197,7 +197,7 @@
             "nrqlQueries": [
               {
                 "accountIds": [8421772],
-                "query": "SELECT count(*) FROM Log WHERE event = 'integration.error' AND (entity.name = 'oficina-api-prod' OR namespace_name = 'prod') FACET integration SINCE 7 days ago TIMESERIES"
+                "query": "SELECT count(*) FROM Log WHERE event = 'integration.error' AND (entity.name = 'oficina-os-service-prod' OR (namespace_name = 'prod' AND container_name = 'os-service')) FACET integration SINCE 7 days ago TIMESERIES"
               }
             ],
             "platformOptions": { "ignoreTimeRange": false },
@@ -215,7 +215,7 @@
             "nrqlQueries": [
               {
                 "accountIds": [8421772],
-                "query": "SELECT timestamp, integration, osNumero, error, requestId FROM Log WHERE event = 'integration.error' AND (entity.name = 'oficina-api-prod' OR namespace_name = 'prod') SINCE 7 days ago LIMIT 50"
+                "query": "SELECT timestamp, integration, osNumero, error, requestId FROM Log WHERE event = 'integration.error' AND (entity.name = 'oficina-os-service-prod' OR (namespace_name = 'prod' AND container_name = 'os-service')) SINCE 7 days ago LIMIT 50"
               }
             ],
             "platformOptions": { "ignoreTimeRange": false }

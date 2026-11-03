@@ -6,7 +6,7 @@ Como a stack da oficina é monitorada, como reproduzir a demonstração do víde
 
 | Fonte | O que envia | Onde é configurado |
 |---|---|---|
-| **Agente APM Node** (`newrelic`, carregado via `NODE_OPTIONS=-r newrelic`) | `Transaction` (latência, throughput, taxa de erro), distributed tracing e encaminhamento dos logs da aplicação | [k8s/base/app-deployment.yaml](../../k8s/base/app-deployment.yaml) — `NEW_RELIC_APP_NAME` vem do overlay (`oficina-api-homolog` / `oficina-api-prod`) |
+| **Agente APM Node** (`newrelic`, carregado via `NODE_OPTIONS=-r newrelic`) | `Transaction` (latência, throughput, taxa de erro), distributed tracing e encaminhamento dos logs da aplicação | [k8s/base/os-service-deployment.yaml](../../k8s/base/os-service-deployment.yaml) — `NEW_RELIC_APP_NAME` vem do overlay (`oficina-os-service-homolog` / `oficina-os-service-prod`) |
 | **nri-bundle** (Helm, namespace `newrelic`) | `K8sContainerSample`, `K8sPodSample`, `K8sDeploymentSample`, `K8sNodeSample` (CPU/memória/réplicas) + logs de todos os pods via **Fluent Bit** | repo `tc-oficina-infra-k8s`, `addons.tf` |
 | **Synthetics** (ping) | `SyntheticCheck` — uptime dos endpoints do API Gateway | UI do New Relic (monitores `oficina-health-homolog` / `oficina-health-prod`) |
 | **CloudWatch** | logs da Lambda de autenticação | AWS (repo `tc-oficina-lambda-auth`) |
@@ -16,18 +16,29 @@ Ambientes são separados por `appName` (APM/logs do agente) e por `namespaceName
 ## 2. Acesso à conta
 
 - Conta New Relic **free tier**, região US, e-mail do grupo. Todos os membros são convidados em **Administration → Users**.
-- A *license key* (Administration → API keys → tipo `INGEST - LICENSE`) está nos GitHub Secrets como `NEW_RELIC_LICENSE_KEY` nos repositórios `tc-oficina-app` e `tc-oficina-infra-k8s`. **Nunca commitar a chave.**
+- A *license key* (Administration → API keys → tipo `INGEST - LICENSE`) está nos GitHub Secrets como `NEW_RELIC_LICENSE_KEY` nos repositórios `tc-oficina-os-service` e `tc-oficina-infra-k8s`. **Nunca commitar a chave.**
 
 ## 3. Importar os dashboards versionados
 
-Os dois dashboards são versionados como JSON neste diretório:
+Os três dashboards são versionados como JSON neste diretório:
 
 | Arquivo | Dashboard | Cobre |
 |---|---|---|
 | [dashboard-operacao.json](dashboard-operacao.json) | `Oficina — Operação` | volume diário de OS, tempo médio por status, erros de integração |
 | [dashboard-plataforma.json](dashboard-plataforma.json) | `Oficina — Plataforma` | latência p50/p95/p99, taxa de erro HTTP, CPU/memória dos pods, réplicas x HPA, uptime |
+| [dashboard-fluxo-os.json](dashboard-fluxo-os.json) | `Oficina — Fluxo da OS` | fluxos iniciados e por status final, compensações por motivo, tempo por etapa, DLQs, mensagens fora do contrato, estornos esgotados, latência e throughput dos três serviços |
 
 Cada um tem duas páginas (`Homolog` e `Prod`).
+
+Os dashboards `Operação` e `Plataforma` olham só o `os-service` (`oficina-os-service-<env>` no APM; `container_name = 'os-service'` nos logs; `containerName`/`deploymentName = 'os-service'` nas métricas de K8s). Como os três serviços dividem o namespace, `namespace_name` sozinho não separa os serviços; por isso o filtro de log é `entity.name = 'oficina-os-service-<env>' OR (namespace_name = '<env>' AND container_name = 'os-service')`.
+
+O dashboard `Fluxo da OS` consome os logs `fluxo.iniciado`, `fluxo.transicao`, `fluxo.falha_tecnica`, `mensageria.dlq_profundidade`, `mensageria.mensagem_invalida` e `billing.estorno.esgotado`, e as `Transaction` dos três serviços (`appName LIKE 'oficina-%-service-<env>'`). Notas de leitura:
+
+- Os widgets de fluxo usam `uniqueCount(fluxoId)` (e não `count(*)`) porque cada linha de log pode chegar duas vezes (ver seção 6). Se "Fluxos por status final" aparecer em dobro, alguma query ficou com `count(*)`.
+- "Tempo médio por etapa" faceta por `etapaAnterior` e usa `duracaoEtapaMs`, que mede o tempo desde a última gravação do fluxo (`updatedAt`). Isso costuma coincidir com a última mudança de etapa, mas não é garantido: qualquer gravação do fluxo (por exemplo, a de um reenvio) zera a contagem.
+- "Throughput de mensagens consumidas" filtra `OtherTransaction/SQS/mensageria/%`: o consumidor abre uma transação em background com nome `mensageria/<tipo>` e grupo `SQS`, e o agente a registra como `OtherTransaction/SQS/mensageria/<tipo>`.
+- "Estornos esgotados" (`billing.estorno.esgotado`) fica zerado até a integração de pagamento do billing existir.
+- "Mensagens fora do contrato" soma os três serviços (filtra só por namespace); os demais widgets de log filtram o `os-service`.
 
 **Antes de importar**, trocar o `accountIds` placeholder pelo ID da conta (o número que aparece na URL `one.newrelic.com/.../accounts/<ID>`):
 
@@ -69,13 +80,13 @@ FROM Log WHERE requestId = '<uuid>' SINCE 1 day ago LIMIT MAX
 
 Para o caminho gateway → app: o API Gateway registra o `requestId` do lado dele nos logs de acesso (CloudWatch) e o repassa no header; o mesmo valor aparece no `requestId` dos logs do app, o que fecha a correlação exigida pelo enunciado.
 
-Pelo APM: **APM & Services → `oficina-api-<env>` → Distributed tracing** → abrir um trace → aba **Logs** ("logs in context", vinculados por `trace.id`).
+Pelo APM: **APM & Services → `oficina-os-service-<env>` → Distributed tracing** → abrir um trace → aba **Logs** ("logs in context", vinculados por `trace.id`).
 
 ## 6. ⚠️ Fonte dupla de logs — validar antes de confiar nos números
 
 Hoje **duas rotas de ingestão de log estão ativas ao mesmo tempo** para os pods do app:
 
-1. o agente APM encaminha os logs (`NEW_RELIC_APPLICATION_LOGGING_FORWARDING_ENABLED=true`, em [k8s/base/app-deployment.yaml](../../k8s/base/app-deployment.yaml));
+1. o agente APM encaminha os logs (`NEW_RELIC_APPLICATION_LOGGING_FORWARDING_ENABLED=true`, em [k8s/base/os-service-deployment.yaml](../../k8s/base/os-service-deployment.yaml));
 2. o Fluent Bit do `nri-bundle` coleta o stdout dos mesmos pods (`newrelic-logging.enabled=true`, em `addons.tf` do repo `tc-oficina-infra-k8s`).
 
 Consequências: cada linha pode ser ingerida **duas vezes** (dobrando `count(*)` no volume de OS e consumindo o dobro da cota de 100 GB), e o atributo `level` chega em formatos diferentes — texto (`"error"`) pela rota do agente, número (`50`, padrão do `pino`) pela rota do Fluent Bit.
@@ -91,7 +102,7 @@ FACET newrelic.source, container_name, entity.name SINCE 30 minutes ago
 Criar uma OS e conferir se a contagem é 1 ou 2. Se for 2, escolher **uma** rota:
 
 - **Recomendado — manter o agente, tirar o app do Fluent Bit.** Preserva "logs in context"/`trace.id`, que é a evidência de correlação exigida na entrega. Alternativa equivalente: desligar o encaminhamento do agente (`NEW_RELIC_APPLICATION_LOGGING_FORWARDING_ENABLED=false`) e ligar `NEW_RELIC_APPLICATION_LOGGING_LOCAL_DECORATING_ENABLED=true`, que injeta o `trace.id` na própria linha de stdout — a correlação continua funcionando pelo Fluent Bit.
-- Depois de consolidar, simplificar os filtros: os JSONs dos dashboards usam `(entity.name = 'oficina-api-<env>' OR namespace_name = '<env>')` justamente para funcionar nas duas rotas, e o alerta 1 usa `(level = 'error' OR numeric(level) >= 50)` pelo mesmo motivo.
+- Depois de consolidar, simplificar os filtros: os JSONs dos dashboards usam `(entity.name = 'oficina-os-service-<env>' OR (namespace_name = '<env>' AND container_name = 'os-service'))` justamente para funcionar nas duas rotas, e o alerta 1 usa `(level = 'error' OR numeric(level) >= 50)` pelo mesmo motivo.
 
 Enquanto as duas rotas estiverem ligadas, os widgets de **contagem** (volume diário de OS, erros de integração) devem ser lidos como tendência, não como número absoluto.
 
@@ -117,6 +128,7 @@ Guardar neste diretório, com dados reais, após rodar o tráfego da seção 7:
 
 - [ ] `Oficina — Operação`, página Homolog (volume, tempo por status, erros)
 - [ ] `Oficina — Plataforma`, página Homolog (latência, CPU/memória, réplicas, uptime)
+- [ ] `Oficina — Fluxo da OS`, página Homolog, depois de rodar um fluxo completo (todos os widgets com dado; "Fluxos por status final" batendo com o número de fluxos executados)
 - [ ] Alerts → Issues & activity com a issue do alerta de falha de OS aberta
 - [ ] E-mail de notificação recebido
 - [ ] Um trace no APM com a aba de logs vinculados (evidência da correlação)
