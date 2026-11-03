@@ -73,6 +73,14 @@ jobs:
             VALOR=$(aws ssm get-parameter --name "$CAMINHO" --query Parameter.Value --output text 2>/dev/null || true)
             if [ -n "$VALOR" ]; then ARGS+=(--from-literal="$NOME=$VALOR"); else echo "::error::$CAMINHO ausente (infra de mensageria não aplicada no ambiente)"; exit 1; fi
           done
+          # DLQs monitoradas (profundidade vira métrica): CSV das 3 URLs.
+          DLQS=()
+          for FILA in execucao-comandos billing-comandos os-orquestrador-eventos; do
+            CAMINHO="/oficina/$ENV/mensageria/$FILA-dlq-url"
+            VALOR=$(aws ssm get-parameter --name "$CAMINHO" --query Parameter.Value --output text 2>/dev/null || true)
+            if [ -n "$VALOR" ]; then DLQS+=("$VALOR"); else echo "::error::$CAMINHO ausente (infra de mensageria não aplicada no ambiente)"; exit 1; fi
+          done
+          ARGS+=(--from-literal=SQS_DLQ_URLS="$(IFS=,; echo "${DLQS[*]}")")
           kubectl create secret generic os-service-secrets -n "$ENV" "${ARGS[@]}" \
             --dry-run=client -o yaml | kubectl apply -n "$ENV" -f -
 
