@@ -106,7 +106,21 @@ Criar uma OS e conferir se a contagem é 1 ou 2. Se for 2, escolher **uma** rota
 
 Enquanto as duas rotas estiverem ligadas, os widgets de **contagem** (volume diário de OS, erros de integração) devem ser lidos como tendência, não como número absoluto.
 
-## 7. Gerar tráfego para a demo
+## 7. Rastreamento distribuído
+
+Cada mensagem publicada pelo outbox carrega os atributos `traceparent`, `tracestate` e `newrelic` (`MessageAttributes` do SQS). O consumidor abre uma transação em background `OtherTransaction/SQS/mensageria/<tipo>` e a liga ao trace de quem publicou, então um fluxo aparece como um único trace atravessando os três serviços.
+
+**Como abrir um trace:**
+
+1. **APM & Services → `oficina-os-service-homolog` → Distributed tracing**.
+2. Filtrar pela transação de abertura (a request HTTP que cria a OS) e abrir um trace.
+3. Para os logs do mesmo fluxo: aba **Logs** do trace (logs vinculados por `trace.id`) ou, em **Logs**, `SELECT timestamp, event, etapa, status, appName FROM Log WHERE fluxoId = '<uuid>' SINCE 1 day ago LIMIT MAX`. O `fluxoId` aparece em todos os logs do orquestrador (`fluxo.*`).
+
+**O que se espera ver** (fluxo feliz): request HTTP de abertura no os-service → `OtherTransaction/SQS/mensageria/SolicitarDiagnostico` no execution → transações de consumo `mensageria/<tipo>` no os-service e no billing conforme os eventos voltam (diagnóstico concluído, orçamento, pagamento, reparo) → os três serviços no mapa do trace.
+
+**Limitação conhecida:** o relay do outbox publica a mensagem em outra transação, então os spans do relay não aparecem no trace; o elo entre os serviços é a própria mensagem, pelos atributos de trace gravados quando o evento entrou no outbox. Se um serviço aparecer sem transação de consumo, conferir se o agente estava ativo (`NEW_RELIC_LICENSE_KEY`) nos dois lados: com o agente desligado as funções de trace viram no-op.
+
+## 8. Gerar tráfego para a demo
 
 Os dashboards precisam de série histórica — rodar **dias antes** da gravação, não na hora:
 
@@ -118,13 +132,13 @@ Os dashboards precisam de série histórica — rodar **dias antes** da gravaç�
 BASE_URL=https://<api_endpoint homolog> k6 run k6/load-test.js
 ```
 
-## 8. Alertas
+## 9. Alertas
 
-Ver [alertas.md](alertas.md): as 4 condições da policy `Oficina — Alertas`, thresholds, destino e o procedimento de disparo real do alerta de falha de OS (quebra controlada do SMTP em homolog, com reversão).
+Ver [alertas.md](alertas.md): as 8 condições da policy `Oficina — Alertas` (4 da API e 4 de mensageria/orquestração), thresholds, destino e os procedimentos de disparo real em homolog: falha de OS (quebra controlada do SMTP, com reversão) e mensagem em DLQ (publicação de uma mensagem inválida na fila do billing).
 
-## 9. Screenshots para o PDF da entrega
+## 10. Screenshots para o PDF da entrega
 
-Guardar neste diretório, com dados reais, após rodar o tráfego da seção 7:
+Guardar neste diretório, com dados reais, após rodar o tráfego da seção 8:
 
 - [ ] `Oficina — Operação`, página Homolog (volume, tempo por status, erros)
 - [ ] `Oficina — Plataforma`, página Homolog (latência, CPU/memória, réplicas, uptime)
@@ -132,3 +146,5 @@ Guardar neste diretório, com dados reais, após rodar o tráfego da seção 7:
 - [ ] Alerts → Issues & activity com a issue do alerta de falha de OS aberta
 - [ ] E-mail de notificação recebido
 - [ ] Um trace no APM com a aba de logs vinculados (evidência da correlação)
+- [ ] Um trace distribuído de um fluxo completo, mostrando as transações `OtherTransaction/SQS/mensageria/*` dos três serviços
+- [ ] Alerts → Issues & activity com a issue da condição 5 (mensagem em DLQ) aberta e o e-mail recebido
