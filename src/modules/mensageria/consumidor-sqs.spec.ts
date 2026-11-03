@@ -5,12 +5,20 @@ import { join } from "node:path";
 import { ConsumidorSqs } from "./consumidor-sqs";
 import { ValidadorContratos } from "./validador-contratos";
 
+jest.mock("./trace", () => ({
+	...jest.requireActual("./trace"),
+	executarComTrace: jest.fn((_nome: string, _cabecalhos: unknown, fn: () => Promise<unknown>) => fn()),
+}));
+
 const exemplo = (tipo: string) => readFileSync(join(process.cwd(), "contratos", "exemplos", `${tipo}.json`), "utf8");
-const msg = (id: string, body: string, origem = "billing") => ({
+const msg = (id: string, body: string, origem = "billing", trace: Record<string, string> = {}) => ({
 	MessageId: id,
 	ReceiptHandle: `rh-${id}`,
 	Body: body,
-	MessageAttributes: { origem: { DataType: "String", StringValue: origem } },
+	MessageAttributes: {
+		origem: { DataType: "String", StringValue: origem },
+		...Object.fromEntries(Object.entries(trace).map(([chave, valor]) => [chave, { DataType: "String", StringValue: valor }])),
+	},
 });
 
 describe("ConsumidorSqs", () => {
@@ -39,6 +47,24 @@ describe("ConsumidorSqs", () => {
 		expect(processar).toHaveBeenCalledWith(expect.objectContaining({ tipo: "OrcamentoGerado" }));
 		expect(apagados()).toEqual(["rh-1"]);
 		expect(erro).toHaveBeenCalledWith(expect.objectContaining({ event: "mensageria.falha_processamento" }));
+	});
+
+	it("processa dentro de transação de trace com os atributos recebidos", async () => {
+		const executarComTrace = jest.requireMock("./trace").executarComTrace as jest.Mock;
+		const trace = { traceparent: "00-a-b-01", tracestate: "k=v" };
+		sqs.send.mockResolvedValueOnce({ Messages: [msg("1", exemplo("OrcamentoGerado"), "billing", trace)] }).mockResolvedValue({});
+		await consumidor.processarLote("url", processar, ["billing", "execution"]);
+		expect(executarComTrace).toHaveBeenCalledWith("OrcamentoGerado", trace, expect.any(Function));
+		expect(processar).toHaveBeenCalledTimes(1);
+		expect(apagados()).toEqual(["rh-1"]);
+	});
+
+	it("mensagem sem atributos de trace ainda é processada", async () => {
+		const executarComTrace = jest.requireMock("./trace").executarComTrace as jest.Mock;
+		sqs.send.mockResolvedValueOnce({ Messages: [msg("1", exemplo("OrcamentoGerado"))] }).mockResolvedValue({});
+		await consumidor.processarLote("url", processar, ["billing", "execution"]);
+		expect(executarComTrace).toHaveBeenCalledWith("OrcamentoGerado", {}, expect.any(Function));
+		expect(processar).toHaveBeenCalledTimes(1);
 	});
 
 	it("mensagem inválida não é processada nem apagada (vai para a DLQ)", async () => {

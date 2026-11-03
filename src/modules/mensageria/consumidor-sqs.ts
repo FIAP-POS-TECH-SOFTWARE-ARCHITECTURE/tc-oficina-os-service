@@ -3,6 +3,7 @@ import { Inject, Injectable, Logger } from "@nestjs/common";
 import { setTimeout as esperar } from "node:timers/promises";
 import { EnvelopeMensagem, OrigemMensagem } from "./envelope";
 import { CLIENTE_SQS } from "./publicador-mensagens.port";
+import { CabecalhosTrace, executarComTrace } from "./trace";
 import { ValidadorContratos } from "./validador-contratos";
 
 export type ProcessadorMensagem = (envelope: EnvelopeMensagem) => Promise<void>;
@@ -82,8 +83,13 @@ export class ConsumidorSqs {
 			await this.apagar(filaUrl, mensagem);
 			return;
 		}
+		const cabecalhos: CabecalhosTrace = {};
+		for (const chave of ["traceparent", "tracestate", "newrelic"] as const) {
+			const valor = mensagem.MessageAttributes?.[chave]?.StringValue;
+			if (valor) cabecalhos[chave] = valor;
+		}
 		try {
-			await processar(envelope);
+			await executarComTrace(envelope.tipo, cabecalhos, () => processar(envelope));
 			await this.apagar(filaUrl, mensagem);
 		} catch (error) {
 			this.logger.error({ event: "mensageria.falha_processamento", erro: (error as Error).message, ...ids });

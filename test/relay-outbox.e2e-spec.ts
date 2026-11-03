@@ -9,7 +9,10 @@ import { PrismaService } from "../src/prisma/prisma.service";
 import { setupApp } from "./helpers/app-factory";
 import { truncateAll } from "./helpers/db";
 
-jest.mock("../src/modules/mensageria/trace", () => ({ capturarCabecalhosTrace: jest.fn(() => ({})) }));
+jest.mock("../src/modules/mensageria/trace", () => ({
+	...jest.requireActual("../src/modules/mensageria/trace"),
+	capturarCabecalhosTrace: jest.fn(() => ({})),
+}));
 
 describe("RelayOutbox com duas réplicas (e2e)", () => {
 	let app: INestApplication;
