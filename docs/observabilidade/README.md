@@ -32,19 +32,16 @@ Cada um tem duas páginas (`Homolog` e `Prod`).
 
 Os dashboards `Operação` e `Plataforma` olham só o `os-service` (`oficina-os-service-<env>` no APM; `container_name = 'os-service'` nos logs; `containerName`/`deploymentName = 'os-service'` nas métricas de K8s). Como os três serviços dividem o namespace, `namespace_name` sozinho não separa os serviços; por isso o filtro de log é `entity.name = 'oficina-os-service-<env>' OR (namespace_name = '<env>' AND container_name = 'os-service')`.
 
-O dashboard `Fluxo da OS` consome os logs `fluxo.iniciado`, `fluxo.transicao`, `fluxo.falha_tecnica`, `mensageria.dlq_profundidade`, `mensageria.mensagem_invalida` e `billing.estorno.esgotado`, e as `Transaction` dos três serviços (`appName LIKE 'oficina-%-service-<env>'`). Notas de leitura:
+O dashboard `Fluxo da OS` consome os logs `fluxo.iniciado`, `fluxo.transicao`, `fluxo.falha_tecnica`, `mensageria.dlq_profundidade`, `mensageria.mensagem_invalida` (billing: `mensageria.mensagem.fora-do-contrato`) e `billing.estorno.esgotado`, e as `Transaction` dos três serviços (`appName LIKE 'oficina-%-service-<env>'`). Notas de leitura:
 
 - Os widgets de fluxo usam `uniqueCount(fluxoId)` (e não `count(*)`) porque cada linha de log pode chegar duas vezes (ver seção 6). Se "Fluxos por status final" aparecer em dobro, alguma query ficou com `count(*)`.
 - "Tempo médio por etapa" faceta por `etapaAnterior` e usa `duracaoEtapaMs`, que mede o tempo desde a última gravação do fluxo (`updatedAt`). Isso costuma coincidir com a última mudança de etapa, mas não é garantido: qualquer gravação do fluxo (por exemplo, a de um reenvio) zera a contagem.
 - "Throughput de mensagens consumidas" filtra `OtherTransaction/SQS/mensageria/%`: o consumidor abre uma transação em background com nome `mensageria/<tipo>` e grupo `SQS`, e o agente a registra como `OtherTransaction/SQS/mensageria/<tipo>`.
+- O p95 de latência dos três serviços inclui as transações de background do consumidor SQS (`OtherTransaction/SQS/mensageria/*`); para ver só HTTP, acrescentar `AND transactionType = 'Web'` à query do widget.
 - "Estornos esgotados" (`billing.estorno.esgotado`) fica zerado até a integração de pagamento do billing existir.
-- "Mensagens fora do contrato" soma os três serviços (filtra só por namespace); os demais widgets de log filtram o `os-service`.
+- "Mensagens fora do contrato" soma os três serviços (filtra só por namespace) e usa `uniqueCount(sqsMessageId)` sobre os eventos `mensageria.mensagem_invalida` (os-service e execution) e `mensageria.mensagem.fora-do-contrato` (billing), para não contar em dobro a linha ingerida pelas duas rotas (seção 6); os demais widgets de log filtram o `os-service`.
 
-**Antes de importar**, trocar o `accountIds` placeholder pelo ID da conta (o número que aparece na URL `one.newrelic.com/.../accounts/<ID>`):
-
-```bash
-sed -i 's/"accountIds": \[0\]/"accountIds": [SEU_ACCOUNT_ID]/g' docs/observabilidade/dashboard-*.json
-```
+**Antes de importar**: os JSONs já trazem o `accountIds` da conta (8421772); só é preciso trocar se a conta mudar (o ID aparece na URL `one.newrelic.com/.../accounts/<ID>`).
 
 Depois: **Dashboards → Import dashboard** (botão `+`) → colar o conteúdo do arquivo → *Import*.
 

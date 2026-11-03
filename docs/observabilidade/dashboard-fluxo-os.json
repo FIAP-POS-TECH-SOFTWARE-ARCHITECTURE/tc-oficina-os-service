@@ -205,7 +205,7 @@
                 "accountIds": [
                   8421772
                 ],
-                "query": "SELECT count(*) FROM Log WHERE event = 'mensageria.mensagem_invalida' AND namespace_name = 'homolog' SINCE 1 day ago"
+                "query": "SELECT uniqueCount(sqsMessageId) FROM Log WHERE event IN ('mensageria.mensagem_invalida', 'mensageria.mensagem.fora-do-contrato') AND namespace_name = 'homolog' SINCE 1 day ago"
               }
             ],
             "platformOptions": {
@@ -510,7 +510,7 @@
                 "accountIds": [
                   8421772
                 ],
-                "query": "SELECT count(*) FROM Log WHERE event = 'mensageria.mensagem_invalida' AND namespace_name = 'prod' SINCE 1 day ago"
+                "query": "SELECT uniqueCount(sqsMessageId) FROM Log WHERE event IN ('mensageria.mensagem_invalida', 'mensageria.mensagem.fora-do-contrato') AND namespace_name = 'prod' SINCE 1 day ago"
               }
             ],
             "platformOptions": {

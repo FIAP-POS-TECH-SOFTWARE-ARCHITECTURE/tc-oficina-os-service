@@ -104,7 +104,8 @@ Condição NRQL:
 
 ```sql
 SELECT max(numeric(mensagens)) FROM Log
-WHERE event = 'mensageria.dlq_profundidade' AND container_name = 'os-service'
+WHERE event = 'mensageria.dlq_profundidade'
+  AND (entity.name LIKE 'oficina-os-service-%' OR container_name = 'os-service')
 FACET fila
 ```
 
