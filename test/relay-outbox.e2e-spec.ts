@@ -91,4 +91,23 @@ describe("RelayOutbox com duas réplicas (e2e)", () => {
 
 		expect(recebidos).toEqual([{ traceparent: "00-t-1-01" }]);
 	});
+
+	it("enfileirar com trace explícito grava esse trace e buscarMensagemEnfileirada o devolve", async () => {
+		const mock = capturarCabecalhosTrace as jest.Mock;
+		mock.mockReturnValue({ traceparent: "00-do-agente-01" });
+		const envelope = criarEnvelope({
+			tipo: "GerarOrcamento",
+			fluxoId: randomUUID(),
+			osId: randomUUID(),
+			numeroOs: "OS-2",
+			correlationId: "c",
+			payload: {},
+		});
+		const tx = new TransacaoFluxoPrisma(prisma, undefined as never, new Logger());
+		await tx.enfileirar("billing-comandos", envelope, { traceparent: "00-original-01" });
+
+		const achada = await tx.buscarMensagemEnfileirada(envelope.messageId);
+		expect(achada?.cabecalhosTrace).toEqual({ traceparent: "00-original-01" });
+		expect(achada?.envelope.messageId).toBe(envelope.messageId);
+	});
 });

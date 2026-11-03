@@ -1,5 +1,6 @@
 import { DestinoMensagem } from "../../../mensageria/configuracao-mensageria";
 import { EnvelopeMensagem } from "../../../mensageria/envelope";
+import { CabecalhosTrace } from "../../../mensageria/trace";
 import { ResultadoReservaEstoque } from "../../../insumos/application/ports/reserva-estoque-os.gateway";
 import { NotificacaoMudancaStatus } from "../../../ordens-servico/application/ports/notificador.gateway";
 import { OsTransition } from "../../../ordens-servico/domain/fluxo-estados-os";
@@ -58,8 +59,8 @@ export interface TransacaoFluxo {
 		usuarioId: string | null,
 	): Promise<NotificacaoMudancaStatus | null>;
 	montarPayloadComando(tipo: TipoComando, fluxo: FluxoOrdemServico, prazos: PrazosFluxo): Promise<Record<string, unknown>>;
-	enfileirar(destino: DestinoMensagem, envelope: EnvelopeMensagem<unknown>): Promise<void>;
-	buscarMensagemEnfileirada(messageId: string): Promise<EnvelopeMensagem | null>;
+	enfileirar(destino: DestinoMensagem, envelope: EnvelopeMensagem<unknown>, trace?: CabecalhosTrace): Promise<void>;
+	buscarMensagemEnfileirada(messageId: string): Promise<{ envelope: EnvelopeMensagem; cabecalhosTrace: CabecalhosTrace } | null>;
 }
 
 export interface RepositorioFluxoPort {

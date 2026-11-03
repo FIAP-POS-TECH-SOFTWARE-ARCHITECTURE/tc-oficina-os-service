@@ -49,7 +49,9 @@ function criarTx(f: FluxoOrdemServico | null) {
 			emailCliente: null,
 		}),
 		montarPayloadComando: jest.fn().mockResolvedValue({ motivo: "x" }),
-		enfileirar: jest.fn(async (destino: string, envelope: unknown) => void enfileiradas.push({ destino, envelope })),
+		enfileirar: jest.fn(
+			async (destino: string, envelope: unknown, trace?: unknown) => void enfileiradas.push({ destino, envelope, trace }),
+		),
 		buscarMensagemEnfileirada: jest.fn(),
 	};
 	return tx as typeof tx & TransacaoFluxo;
@@ -198,9 +200,11 @@ describe("OrquestradorOrdemServico", () => {
 	it("reprocessar reenvia o comando pendente com messageId novo", async () => {
 		const original = evento("IniciarReparo", { itensServico: [], itensInsumo: [] });
 		usar(fluxo({ status: S.FALHA_TECNICA, etapa: E.AGUARDANDO_ACK_REPARO, comandoPendenteMessageId: original.messageId }));
-		tx.buscarMensagemEnfileirada.mockResolvedValue({ ...original, origem: "os" });
+		const cabecalhosTrace = { traceparent: "00-aaaa-bbbb-01" };
+		tx.buscarMensagemEnfileirada.mockResolvedValue({ envelope: { ...original, origem: "os" }, cabecalhosTrace });
 		await orq.reprocessar(fluxo().id);
 		const reenviado = tx.enfileiradas[0].envelope;
+		expect(tx.enfileiradas[0].trace).toEqual(cabecalhosTrace);
 		expect(reenviado.tipo).toBe("IniciarReparo");
 		expect(reenviado.messageId).not.toBe(original.messageId);
 		expect(tx.salvarFluxo).toHaveBeenCalledWith(

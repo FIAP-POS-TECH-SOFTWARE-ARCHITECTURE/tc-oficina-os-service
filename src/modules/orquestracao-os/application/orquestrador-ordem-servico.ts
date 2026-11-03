@@ -235,9 +235,10 @@ export class OrquestradorOrdemServico {
 	private async reenviarComandoPendente(tx: TransacaoFluxo, fluxo: FluxoOrdemServico): Promise<void> {
 		const original = fluxo.comandoPendenteMessageId ? await tx.buscarMensagemEnfileirada(fluxo.comandoPendenteMessageId) : null;
 		if (!original) throw new Error(`Fluxo ${fluxo.id} sem comando pendente para reenviar`);
-		const { tipo, fluxoId, osId, numeroOs, correlationId, payload } = original;
+		const { tipo, fluxoId, osId, numeroOs, correlationId, payload } = original.envelope;
 		const novo = criarEnvelope({ tipo, fluxoId, osId, numeroOs, correlationId, payload });
-		await tx.enfileirar(destinoDoTipo(tipo), novo);
+		// o reenvio costuma rodar fora de transação do agente (cron): mantém o trace da mensagem original
+		await tx.enfileirar(destinoDoTipo(tipo), novo, original.cabecalhosTrace);
 		fluxo.comandoPendenteMessageId = novo.messageId;
 	}
 
