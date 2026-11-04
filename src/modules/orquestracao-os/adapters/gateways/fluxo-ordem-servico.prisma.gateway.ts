@@ -14,6 +14,7 @@ import {
 } from "../../../insumos/application/ports/reserva-estoque-os.gateway";
 import { DestinoMensagem } from "../../../mensageria/configuracao-mensageria";
 import { EnvelopeMensagem } from "../../../mensageria/envelope";
+import { CabecalhosTrace, capturarCabecalhosTrace } from "../../../mensageria/trace";
 import { NotificacaoMudancaStatus } from "../../../ordens-servico/application/ports/notificador.gateway";
 import { registrarTransicaoOs } from "../../../ordens-servico/adapters/gateways/historico-os.prisma";
 import { canTransition, nextStatus, OsTransition } from "../../../ordens-servico/domain/fluxo-estados-os";
@@ -45,6 +46,7 @@ function paraFluxo(linha: FluxoComNumero): FluxoOrdemServico {
 		numeroOs: linha.ordemServico.numero,
 		correlationId: linha.correlationId,
 		comandoPendenteMessageId: linha.comandoPendenteMessageId,
+		atualizadoEm: linha.updatedAt,
 		etapa: linha.etapa as unknown as EtapaFluxoOs,
 		status: linha.status as unknown as StatusFluxoOs,
 		prazoExpiraEm: linha.prazoExpiraEm,
@@ -330,7 +332,7 @@ export class TransacaoFluxoPrisma implements TransacaoFluxo {
 		};
 	}
 
-	async enfileirar(destino: DestinoMensagem, envelope: EnvelopeMensagem<unknown>): Promise<void> {
+	async enfileirar(destino: DestinoMensagem, envelope: EnvelopeMensagem<unknown>, trace?: CabecalhosTrace): Promise<void> {
 		await this.tx.outboxMensagem.create({
 			data: {
 				messageId: envelope.messageId,
@@ -338,13 +340,20 @@ export class TransacaoFluxoPrisma implements TransacaoFluxo {
 				tipo: envelope.tipo,
 				destino,
 				corpo: envelope as unknown as Prisma.InputJsonValue,
+				cabecalhosTrace: trace ?? capturarCabecalhosTrace(),
 			},
 		});
 	}
 
-	async buscarMensagemEnfileirada(messageId: string): Promise<EnvelopeMensagem | null> {
+	async buscarMensagemEnfileirada(
+		messageId: string,
+	): Promise<{ envelope: EnvelopeMensagem; cabecalhosTrace: CabecalhosTrace } | null> {
 		const linha = await this.tx.outboxMensagem.findUnique({ where: { messageId } });
-		return (linha?.corpo as unknown as EnvelopeMensagem | undefined) ?? null;
+		if (!linha) return null;
+		return {
+			envelope: linha.corpo as unknown as EnvelopeMensagem,
+			cabecalhosTrace: (linha.cabecalhosTrace as CabecalhosTrace | null) ?? {},
+		};
 	}
 }
 

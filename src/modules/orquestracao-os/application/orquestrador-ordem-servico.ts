@@ -183,6 +183,8 @@ export class OrquestradorOrdemServico {
 			return [];
 		}
 
+		const etapaAnterior = fluxo.etapa;
+		const desde = fluxo.atualizadoEm.getTime();
 		Object.assign(fluxo, decisao.estado);
 		for (const acao of decisao.acoesLocais) {
 			if (acao.tipo === "ESTORNAR_RESERVA")
@@ -205,7 +207,18 @@ export class OrquestradorOrdemServico {
 			);
 		}
 		await tx.salvarFluxo(fluxo);
-		this.logger.log({ event: "fluxo.transicao", etapa: fluxo.etapa, status: fluxo.status, comandos: decisao.comandos, ...ids });
+		this.logger.log({
+			event: "fluxo.transicao",
+			etapaAnterior,
+			etapa: fluxo.etapa,
+			status: fluxo.status,
+			duracaoEtapaMs: Date.now() - desde,
+			motivoCompensacao:
+				fluxo.status === StatusFluxoOs.COMPENSANDO || fluxo.status === StatusFluxoOs.COMPENSADO ? fluxo.motivoCompensacao : undefined,
+			comandos: decisao.comandos,
+			numeroOs: fluxo.numeroOs,
+			...ids,
+		});
 		return notificacao ? [notificacao] : [];
 	}
 
@@ -222,9 +235,10 @@ export class OrquestradorOrdemServico {
 	private async reenviarComandoPendente(tx: TransacaoFluxo, fluxo: FluxoOrdemServico): Promise<void> {
 		const original = fluxo.comandoPendenteMessageId ? await tx.buscarMensagemEnfileirada(fluxo.comandoPendenteMessageId) : null;
 		if (!original) throw new Error(`Fluxo ${fluxo.id} sem comando pendente para reenviar`);
-		const { tipo, fluxoId, osId, numeroOs, correlationId, payload } = original;
+		const { tipo, fluxoId, osId, numeroOs, correlationId, payload } = original.envelope;
 		const novo = criarEnvelope({ tipo, fluxoId, osId, numeroOs, correlationId, payload });
-		await tx.enfileirar(destinoDoTipo(tipo), novo);
+		// o reenvio costuma rodar fora de transação do agente (cron): mantém o trace da mensagem original
+		await tx.enfileirar(destinoDoTipo(tipo), novo, original.cabecalhosTrace);
 		fluxo.comandoPendenteMessageId = novo.messageId;
 	}
 

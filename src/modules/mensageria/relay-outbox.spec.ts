@@ -1,8 +1,9 @@
 import { Logger } from "@nestjs/common";
 import { RelayOutbox } from "./relay-outbox";
 
-const linha = (id: string, destino: string, tentativas = 0) => ({
+const linha = (id: string, destino: string, tentativas = 0, cabecalhos_trace: unknown = null) => ({
 	id,
+	cabecalhos_trace,
 	message_id: `m-${id}`,
 	destino,
 	corpo: { tipo: "X", messageId: `m-${id}` },
@@ -26,12 +27,20 @@ describe("RelayOutbox", () => {
 	it("publica comando na fila e evento no tópico e marca ENVIADA", async () => {
 		prisma.$queryRaw.mockResolvedValueOnce([linha("1", "billing-comandos"), linha("2", "eventos")]);
 		expect(await relay.processarLote()).toBe(2);
-		expect(publicador.enviarComando).toHaveBeenCalledWith("billing-comandos", { tipo: "X", messageId: "m-1" });
-		expect(publicador.publicarEvento).toHaveBeenCalledWith({ tipo: "X", messageId: "m-2" });
+		expect(publicador.enviarComando).toHaveBeenCalledWith("billing-comandos", { tipo: "X", messageId: "m-1" }, {});
+		expect(publicador.publicarEvento).toHaveBeenCalledWith({ tipo: "X", messageId: "m-2" }, {});
 		expect(prisma.outboxMensagem.update).toHaveBeenCalledWith({
 			where: { id: "1" },
 			data: { status: "ENVIADA", enviadaEm: expect.any(Date), ultimoErro: null },
 		});
+	});
+
+	it("repassa ao publicador os cabeçalhos de trace persistidos", async () => {
+		const trace = { traceparent: "00-t-1-01" };
+		prisma.$queryRaw.mockResolvedValueOnce([linha("1", "billing-comandos", 0, trace), linha("2", "eventos", 0, trace)]);
+		await relay.processarLote();
+		expect(publicador.enviarComando).toHaveBeenCalledWith("billing-comandos", expect.anything(), trace);
+		expect(publicador.publicarEvento).toHaveBeenCalledWith(expect.anything(), trace);
 	});
 
 	it("falha incrementa tentativas com backoff; na décima vira FALHA", async () => {

@@ -1,11 +1,18 @@
-import { INestApplication } from "@nestjs/common";
+import { INestApplication, Logger } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
-import { EnvelopeMensagem } from "../src/modules/mensageria/envelope";
+import { EnvelopeMensagem, criarEnvelope } from "../src/modules/mensageria/envelope";
 import { PublicadorMensagensPort } from "../src/modules/mensageria/publicador-mensagens.port";
 import { RelayOutbox } from "../src/modules/mensageria/relay-outbox";
+import { capturarCabecalhosTrace } from "../src/modules/mensageria/trace";
+import { TransacaoFluxoPrisma } from "../src/modules/orquestracao-os/adapters/gateways/fluxo-ordem-servico.prisma.gateway";
 import { PrismaService } from "../src/prisma/prisma.service";
 import { setupApp } from "./helpers/app-factory";
 import { truncateAll } from "./helpers/db";
+
+jest.mock("../src/modules/mensageria/trace", () => ({
+	...jest.requireActual("../src/modules/mensageria/trace"),
+	capturarCabecalhosTrace: jest.fn(() => ({})),
+}));
 
 describe("RelayOutbox com duas réplicas (e2e)", () => {
 	let app: INestApplication;
@@ -57,5 +64,50 @@ describe("RelayOutbox com duas réplicas (e2e)", () => {
 		expect(publicados).toHaveLength(60);
 		expect(new Set(publicados).size).toBe(60);
 		expect(await prisma.outboxMensagem.count({ where: { status: "ENVIADA" } })).toBe(60);
+	});
+
+	it("publica o trace capturado no enfileiramento, não o do momento do envio", async () => {
+		const mock = capturarCabecalhosTrace as jest.Mock;
+		mock.mockReturnValue({ traceparent: "00-t-1-01" });
+		const envelope = criarEnvelope({
+			tipo: "GerarOrcamento",
+			fluxoId: randomUUID(),
+			osId: randomUUID(),
+			numeroOs: "OS-1",
+			correlationId: "c",
+			payload: {},
+		});
+		await new TransacaoFluxoPrisma(prisma, undefined as never, new Logger()).enfileirar("billing-comandos", envelope);
+		mock.mockReturnValue({ traceparent: "00-outro-2-01" });
+
+		const recebidos: unknown[] = [];
+		const publicador: PublicadorMensagensPort = {
+			enviarComando: async (_fila, _envelope, trace) => {
+				recebidos.push(trace);
+			},
+			publicarEvento: async () => undefined,
+		};
+		await new RelayOutbox(prisma, publicador).processarLote();
+
+		expect(recebidos).toEqual([{ traceparent: "00-t-1-01" }]);
+	});
+
+	it("enfileirar com trace explícito grava esse trace e buscarMensagemEnfileirada o devolve", async () => {
+		const mock = capturarCabecalhosTrace as jest.Mock;
+		mock.mockReturnValue({ traceparent: "00-do-agente-01" });
+		const envelope = criarEnvelope({
+			tipo: "GerarOrcamento",
+			fluxoId: randomUUID(),
+			osId: randomUUID(),
+			numeroOs: "OS-2",
+			correlationId: "c",
+			payload: {},
+		});
+		const tx = new TransacaoFluxoPrisma(prisma, undefined as never, new Logger());
+		await tx.enfileirar("billing-comandos", envelope, { traceparent: "00-original-01" });
+
+		const achada = await tx.buscarMensagemEnfileirada(envelope.messageId);
+		expect(achada?.cabecalhosTrace).toEqual({ traceparent: "00-original-01" });
+		expect(achada?.envelope.messageId).toBe(envelope.messageId);
 	});
 });
