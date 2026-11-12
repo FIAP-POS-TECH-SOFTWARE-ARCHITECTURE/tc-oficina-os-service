@@ -6,8 +6,10 @@ microsserviços (OS, Billing e Execution), cada um com o seu banco, coordenados 
 o API Gateway com autenticação por CPF via Lambda.
 
 Este documento mostra os componentes, os bancos e a comunicação entre eles. O fluxo da Saga
-(passos, compensações) e as decisões estão nas ADRs; os nomes de filas, tópico, mensagens e
-rotas internas estão em [`contratos/README.md`](../../contratos/README.md).
+(passos, compensações) e as decisões estão nas ADRs — em especial a
+[ADR-008](adrs/adr-008-saga-orquestrada.md) (Saga orquestrada) e a
+[ADR-009](adrs/adr-009-mensageria-sns-sqs.md) (mensageria SNS/SQS); os nomes de filas, tópico,
+mensagens e rotas internas estão em [`contratos/README.md`](../../contratos/README.md).
 
 ```mermaid
 flowchart LR
