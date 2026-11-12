@@ -14,6 +14,8 @@ Todos os diagramas são Mermaid e renderizam nativamente no GitHub.
 | [componentes.md](componentes.md) | Diagrama de componentes com visão de nuvem completa (gateway, Lambdas, EKS, RDS, SSM, observabilidade, CI/CD) + legenda componente → repositório e contratos entre repositórios. |
 | [sequencia-autenticacao.md](sequencia-autenticacao.md) | Diagrama de sequência: emissão do JWT a partir do CPF e uso do token numa rota sensível do cliente. |
 | [sequencia-abertura-os.md](sequencia-abertura-os.md) | Diagrama de sequência: criação de OS e transição de status (onde vivem a notificação por e-mail e o alerta de falha de integração). |
+| [sequencia-fluxo-os.md](sequencia-fluxo-os.md) | Diagrama de sequência: caminho feliz da OS entre `os-service` (orquestrador da Saga), `execution-service` e `billing-service`, com o status da OS e a etapa do fluxo em cada passo. |
+| [sequencia-compensacao.md](sequencia-compensacao.md) | Diagramas de sequência das compensações (reparo inviável e pagamento atrasado), estados do fluxo e tabela de compensações como implementada. |
 | [banco-de-dados.md](banco-de-dados.md) | Justificativa formal do PostgreSQL/RDS, ajustes do modelo na Fase 3, DER e explicação de cada relacionamento. |
 
 ## RFCs — decisões técnicas
