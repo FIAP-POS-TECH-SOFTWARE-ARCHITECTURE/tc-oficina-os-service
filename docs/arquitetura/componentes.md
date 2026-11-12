@@ -10,8 +10,8 @@ pipelines de CI/CD.
 ```mermaid
 graph TB
     subgraph Clientes
-        CLI[Cliente da oficina<br/>app/portal]
-        STAFF[Equipe interna<br/>atendente/mecanico/estoquista/admin]
+        CLI["Cliente da oficina<br/>app/portal"]
+        STAFF["Equipe interna<br/>atendente/mecanico/estoquista/admin"]
     end
 
     subgraph AWS["AWS us-east-1"]

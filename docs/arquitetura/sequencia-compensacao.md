@@ -64,9 +64,11 @@ sequenceDiagram
     Note over CL: o cliente é avisado pela notificação de mudança de status da OS
 ```
 
-Se o estorno falhar no provedor, o billing responde `EstornoFalhou { proximaTentativaEm }`,
-reagenda a própria tentativa e o orquestrador apenas empurra o prazo da compensação para
-depois dela (e registra o alerta `fluxo.estorno_falhou`).
+Com o adapter Mercado Pago, uma falha de estorno no provedor fará o billing responder
+`EstornoFalhou { proximaTentativaEm }` e reagendar a tentativa; o orquestrador já trata esse
+evento (adia o prazo e registra `fluxo.estorno_falhou`). Hoje, com o adapter simulado, a falha
+faz a mensagem voltar à fila (DLQ após 5 recebimentos), e o orquestrador reenvia a compensação
+até 3 vezes antes de `FALHA_TECNICA`.
 
 ## (b) Pagamento atrasado
 
@@ -101,9 +103,9 @@ sequenceDiagram
     OS--)OS: publica FluxoCompensado
 ```
 
-Quando o pagamento tardio é o evento chegando, o billing registra o pagamento sobre o
-orçamento já `CANCELADO` marcando-o como atrasado (`pagamentoAtrasado`). No orquestrador, o
-mesmo `pagamentoId` entregue duas vezes é ignorado.
+Quando o pagamento chega atrasado, o billing o registra sobre o orçamento já `CANCELADO`
+(`pagamentoAtrasado = true`) — comportamento que depende do webhook do adapter real. No
+orquestrador, o mesmo `pagamentoId` entregue duas vezes é ignorado.
 
 > **Mercado Pago:** o adapter de pagamento do billing hoje é simulado
 > (`gateway-pagamento.simulado.ts`, atrás de `GatewayPagamentoPort`), e não há controller de
@@ -136,6 +138,7 @@ vai direto para `COMPENSADO`.
 | `FINALIZADO` (fluxo `CONCLUIDO`) | — | — | Ponto sem volta: `FINALIZADA` não aceita `cancelar`, e o fluxo concluído ignora novos eventos. |
 | Fluxo `COMPENSANDO` ou `COMPENSADO`, `PagamentoConfirmado` (pagamento atrasado) | `EstornarPagamento` | não | Fluxo volta a `COMPENSANDO`; alerta `fluxo.pagamento_atrasado`. |
 | Fluxo `EM_ANDAMENTO` antes da aprovação (diagnóstico, estoque, orçamento), `PagamentoConfirmado` | `EstornarPagamento` | não | Estorno avulso, o fluxo não muda; alerta `fluxo.pagamento_inesperado`. |
+| Fluxo já pago (etapas de reparo), `PagamentoConfirmado` com outro `pagamentoId` | — | — | Nenhum comando; só o alerta `fluxo.pagamento_inesperado` (decisão manual). |
 | Fluxo `COMPENSADO` ou `CONCLUIDO` recebe `ExecucaoEnfileirada` (ordem criada depois do fim do fluxo) | `CancelarExecucao` | não | Cancelamento tardio de execução; alerta `fluxo.cancelamento_tardio`. O `execution-service` também recusa a criação quando já registrou o cancelamento do fluxo e responde `ExecucaoCancelada`. |
 | `AGUARDANDO_ACK_REPARO`, prazo de resposta vencido | — | — | Não compensa: o pagamento já foi feito. Fluxo vai para `FALHA_TECNICA` (alerta `fluxo.falha_tecnica`). |
 

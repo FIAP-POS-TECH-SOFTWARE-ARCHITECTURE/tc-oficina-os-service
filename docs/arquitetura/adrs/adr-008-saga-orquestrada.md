@@ -49,7 +49,7 @@ Os diagramas do caminho feliz e das compensações estão em
 | 3 | Reserva de estoque (local, na transação do orquestrador) → `GerarOrcamento` | os → billing | `EM_DIAGNOSTICO` (ou `BLOQUEADA` sem estoque, retomando quando houver) | Compensável: estorno da reserva |
 | 4 | `OrcamentoGerado` → aprovação pelo cliente | billing | `AGUARDANDO_APROVACAO` | Compensável: `CancelarOrcamento` + estorno da reserva (rejeição ou prazo) |
 | 5 | `OrcamentoAprovado` → pagamento | billing | `AGUARDANDO_PAGAMENTO` | Compensável: `CancelarOrcamento` + estorno da reserva (prazo de pagamento) |
-| 6 | **`PagamentoConfirmado`** → `IniciarReparo` | billing → os → execution | `EM_EXECUCAO` | **Fim da compensação automática por falha técnica.** Daqui em diante, comando sem confirmação no prazo leva o fluxo a `FALHA_TECNICA` (decisão humana). Só a falha **de negócio** `ReparoInviavel` compensa sozinha: `EstornarPagamento`, `CancelarOrcamento`, estorno da reserva |
+| 6 | **`PagamentoConfirmado`** → `IniciarReparo` | billing → os → execution | `EM_EXECUCAO` | **Fim da compensação automática por falha técnica.** Daqui em diante, comando sem confirmação no prazo leva o fluxo a `FALHA_TECNICA` (decisão humana). Só a falha **de negócio** `ReparoInviavel` compensa sozinha: `EstornarPagamento`, `CancelarOrcamento`, estorno da reserva; o cancelamento pela equipe (`ADMINISTRADOR`) também dispara `CancelarExecucao`, `EstornarPagamento`, `CancelarOrcamento` e o estorno da reserva |
 | 7 | **`ReparoConcluido`** | execution → os | `FINALIZADA` | **Ponto sem volta:** reparo feito e pago não se desfaz; `FINALIZADA` não é cancelável. O que vem depois (`FluxoConcluido`, entrega) só é retentável |
 
 Com o adapter de pagamento simulado em uso hoje, `PagamentoConfirmado` só é produzido pelos
@@ -99,8 +99,10 @@ As contramedidas aplicadas são as duas vistas na aula:
   diagnóstico, estoque e aprovação já estão garantidos.
 - **Reler Valor** (Rever Valor) — reler o dado imediatamente antes de atualizá-lo e decidir
   sobre o valor relido:
-  - no orquestrador, toda transação (evento, ação da equipe, job de prazos) começa com
-    `SELECT id FROM fluxos_ordem_servico WHERE id = ... FOR UPDATE` e só então lê o
+  - no orquestrador, toda decisão sobre um fluxo existente (evento, job de prazos, ação da
+    equipe) começa travando a linha do fluxo com
+    `SELECT id FROM fluxos_ordem_servico WHERE id = ... FOR UPDATE` (as ações da equipe
+    travam a mesma linha por `os_id`) e só então lê o
     `FluxoOrdemServico` e decide. Eventos concorrentes do mesmo fluxo são serializados entre
     réplicas, e cada um vê o estado deixado pelo anterior;
   - no Billing, toda atualização do orçamento no DynamoDB é uma escrita condicional
@@ -110,7 +112,7 @@ As contramedidas aplicadas são as duas vistas na aula:
     aprovar ou rejeitar orçamento já cancelado ou com prazo de aprovação vencido.
 
 Como complemento, nos termos do livro de referência: o status do fluxo funciona como
-*semantic lock* (a OS com fluxo ativo só muda pelo orquestrador), os passos 1–5 são
+*semantic lock* (a OS com fluxo ativo só muda pelo orquestrador), os passos 1–6 são
 *compensáveis*, `ReparoConcluido` é o *pivô* e o que vem depois é *retentável*. No Execution,
 a fila de trabalho usa `SELECT ... FOR UPDATE SKIP LOCKED`, de modo que dois mecânicos nunca
 pegam a mesma ordem.

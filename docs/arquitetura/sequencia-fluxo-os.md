@@ -104,8 +104,8 @@ O estado do fluxo (`StatusFluxoOs`) é separado da etapa: `EM_ANDAMENTO`, `COMPE
   bem-sucedida desbloqueia a OS (`EM_DIAGNOSTICO`) e o fluxo segue para o orçamento.
 - **Pagamento por último.** O pagamento é o último passo antes do reparo e a reserva já está
   feita: se o fluxo for cancelado depois, o estorno do dinheiro e o estorno da reserva são
-  compensações explícitas (contramedida de "visão pessimista" contra _dirty read_ e _lost
-  update_, ver [visao-geral-microsservicos.md](visao-geral-microsservicos.md)).
+  compensações explícitas (contramedida de **Visão Pessimista** contra _dirty read_; ver
+  [ADR-008](adrs/adr-008-saga-orquestrada.md)).
 - **Pagamento em atraso na aprovação.** Se `PagamentoConfirmado` chega com o fluxo ainda em
   `AGUARDANDO_APROVACAO`, o orquestrador aplica `orcamento_aprovado` e `pagamento_confirmado`
   em sequência e segue direto para o reparo.

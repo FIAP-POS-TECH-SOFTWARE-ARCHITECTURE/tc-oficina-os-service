@@ -1,8 +1,8 @@
-# Documentação da arquitetura — Fase 3
+# Documentação da arquitetura
 
 Fonte única da documentação arquitetural do sistema da oficina (Tech Challenge FIAP SOAT,
-grupo Integradores). Os outros repositórios (`tc-oficina-lambda-auth`,
-`tc-oficina-infra-k8s`, `tc-oficina-infra-db`) linkam para cá.
+grupo Integradores). Os outros repositórios (`tc-oficina-billing-service`, `tc-oficina-execution-service`,
+`tc-oficina-lambda-auth`, `tc-oficina-infra-k8s`, `tc-oficina-infra-db`) linkam para cá.
 
 Todos os diagramas são Mermaid e renderizam nativamente no GitHub.
 
@@ -43,7 +43,7 @@ Todos os diagramas são Mermaid e renderizam nativamente no GitHub.
 | [ADR-010](adrs/adr-010-banco-por-servico.md) | Banco por serviço: PostgreSQL no OS e RDS próprio no Execution, DynamoDB no Billing; nenhum serviço lê o banco de outro. |
 | [ADR-011](adrs/adr-011-infra-de-dados-centralizada.md) | Terraform dos três bancos em `tc-oficina-infra-db`, arquivos por serviço e `prevent_destroy`. |
 | [ADR-012](adrs/adr-012-outbox-e-idempotencia.md) | Outbox transacional (Postgres e equivalente DynamoDB), regras de idempotência do consumidor e contratos versionados em `contratos/`. |
-| [ADR-013](adrs/adr-013-pagamento-antes-do-reparo-mercado-pago.md) | Pagamento antes do reparo com Mercado Pago Checkout Pro, webhook assinado e estorno como compensação. |
+| [ADR-013](adrs/adr-013-pagamento-antes-do-reparo-mercado-pago.md) | Pagamento antes do reparo com Mercado Pago Checkout Pro, webhook assinado e estorno como compensação (adapter atual simulado; Mercado Pago é o adapter-alvo). |
 | [ADR-014](adrs/adr-014-qualidade-sonarqube-bdd-ministack.md) | SonarQube em container no CI (gate "Cobertura 80"), BDD com `jest-cucumber` em pt-BR e MiniStack como emulador AWS. |
 | [ADR-015](adrs/adr-015-estrategia-de-deploy-rolling-update.md) | Rolling update do Kubernetes (`maxUnavailable: 0`, `maxSurge: 1`) com readiness `/health/ready`; homolog antes de prod. |
 

@@ -228,7 +228,7 @@ Variáveis mínimas (base em [`.env.example`](.env.example)):
 | `PRAZO_APROVACAO`, `PRAZO_PAGAMENTO`, `PRAZO_RESPOSTA_SERVICO` | prazos do fluxo, em minutos inteiros |
 | `WORKERS_HABILITADOS` | `false` desliga os workers |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM` | notificação por e-mail (Mailhog em dev) |
-| `NEW_RELIC_LICENSE_KEY`, `NEW_RELIC_APP_NAME` | observabilidade |
+| `NEW_RELIC_LICENSE_KEY`, `NEW_RELIC_APP_NAME` | observabilidade (só no cluster) |
 
 Outros comandos úteis: `npm run ministack:down` para parar o emulador;
 `docker compose up -d --build` (na raiz) sobe API + Postgres + Mailhog num único comando, usando
@@ -239,9 +239,9 @@ Mailhog em <http://localhost:8025>. Manifestos Kubernetes em [`k8s/`](k8s/README
 ## Testes e qualidade ✱
 
 ```bash
-npm test                  # unitários + BDD (jest-cucumber)
+npm test                  # unitários + BDD (jest-cucumber) (requer Docker)
 npm run test:cov          # unitários + BDD com cobertura (thresholds de 80% no package.json)
-npm run test:integracao   # contra o MiniStack (requer: npm run ministack:up)
+npm run test:integracao   # MiniStack real via Testcontainers (requer Docker)
 npm run test:e2e          # e2e com Testcontainers, Postgres real (requer Docker; antes: cp .env.test.example .env.test)
 npm run lint:check
 npm run sonar:up && npm run sonar:scan   # SonarQube local com quality gate

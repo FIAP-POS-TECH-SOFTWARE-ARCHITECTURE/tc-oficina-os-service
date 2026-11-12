@@ -118,7 +118,7 @@ FACET fila
 
 O `MonitorDlq` do os-service consulta a cada 60 s a profundidade das filas de mensagens mortas (as três DLQs, lidas dos parâmetros do SSM) e loga `{ event: "mensageria.dlq_profundidade", fila, mensagens }`; a mesma medida vai para a métrica `Custom/Mensageria/DLQ/<fila>`. O `FACET fila` abre uma série por DLQ, então a issue indica qual fila acumulou mensagem. Se o monitor falhar, loga `mensageria.dlq_erro` (e `mensageria.dlq_monitor_desligado` quando não há fila configurada); nesses casos a condição fica sem dados e **não** alerta, por isso vale procurar esses dois eventos quando uma DLQ parecer vazia demais.
 
-**Como simular** (em **homolog**, avisando o grupo antes): publicar na fila de comandos do billing uma mensagem inválida. Ela não é apagada pelo consumidor e vai para a DLQ após 5 recebimentos (contrato §1).
+**Como simular** (em **homolog**, avisando o grupo antes): publicar na fila de comandos do billing uma mensagem inválida. Ela não é apagada pelo consumidor e vai para a DLQ após 5 recebimentos (seção 1 de `contratos/README.md`).
 
 ```bash
 URL=$(aws ssm get-parameter --name /oficina/homolog/mensageria/billing-comandos-url --query Parameter.Value --output text)
