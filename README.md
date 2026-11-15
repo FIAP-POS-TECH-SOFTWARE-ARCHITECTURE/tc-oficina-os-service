@@ -291,8 +291,7 @@ repositórios), `ADMIN_BOOTSTRAP_EMAIL`, `ADMIN_BOOTSTRAP_PASSWORD`, `NEW_RELIC_
 `internal-api-key`, `mensageria/eventos-topic-arn`, `mensageria/execucao-comandos-url`,
 `mensageria/billing-comandos-url`, `mensageria/os-orquestrador-eventos-url` e as três
 `mensageria/*-dlq-url`. Sem a infraestrutura de mensageria aplicada, o deploy falha de
-propósito. O CD escreve `os-service-lb-hostname` (e `app-lb-hostname`, durante a migração da
-borda) para o gateway.
+propósito. O CD escreve `os-service-lb-hostname` para o gateway.
 
 O `terraform apply` da infraestrutura é **manual**, documentado em `tc-oficina-infra-k8s` e
 `tc-oficina-infra-db`; este pipeline faz só o deploy da aplicação.
