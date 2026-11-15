@@ -1,0 +1,173 @@
+# Ambiente combinado da demonstração: os 3 microsserviços, bancos próprios e um único MiniStack compartilhado.
+# Não usar direto: `bash scripts/ambiente-demo-local.sh up` preenche OS_DIR, BILLING_DIR, EXECUCAO_DIR e CERTS_DIR.
+name: oficina-demo
+
+x-aws: &aws
+  AWS_REGION: us-east-1
+  AWS_ENDPOINT_URL: http://ministack:4566
+  AWS_ACCESS_KEY_ID: test
+  AWS_SECRET_ACCESS_KEY: test
+  SNS_EVENTOS_ARN: arn:aws:sns:us-east-1:000000000000:oficina-local-eventos
+
+x-segredos: &segredos
+  JWT_SECRET: ${JWT_SECRET:-a3f9c1d8e7b2f4a6c9d1e0b3a5f7c8d9e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6}
+  INTERNAL_API_KEY: ${INTERNAL_API_KEY:-dev-internal-key}
+
+services:
+  ministack:
+    image: ministackorg/ministack:1.5.17
+    container_name: oficina-demo-ministack
+    ports:
+      - "4566:4566"
+    environment:
+      MINISTACK_REGION: us-east-1
+
+  # Filas, DLQs, tópico e assinatura do contrato (mesmo script do `npm run mensageria:local`).
+  mensageria-init:
+    image: oficina-demo-os:local
+    build: ${OS_DIR:?rode via scripts/ambiente-demo-local.sh}
+    entrypoint: ["node", "/init/mensageria-local.cjs"]
+    volumes:
+      - ${OS_DIR}/scripts:/init:ro
+    environment:
+      NODE_PATH: /app/node_modules
+      AWS_ENDPOINT_URL: http://ministack:4566
+    depends_on:
+      ministack:
+        condition: service_healthy
+
+  dynamodb-init:
+    image: amazon/aws-cli:2.27.41
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        aws dynamodb describe-table --table-name oficina-billing-local >/dev/null 2>&1 || aws dynamodb create-table
+        --table-name oficina-billing-local --billing-mode PAY_PER_REQUEST
+        --attribute-definitions AttributeName=pk,AttributeType=S AttributeName=sk,AttributeType=S AttributeName=gsi1pk,AttributeType=S AttributeName=gsi1sk,AttributeType=S
+        --key-schema AttributeName=pk,KeyType=HASH AttributeName=sk,KeyType=RANGE
+        --global-secondary-indexes '[{"IndexName":"gsi1","KeySchema":[{"AttributeName":"gsi1pk","KeyType":"HASH"},{"AttributeName":"gsi1sk","KeyType":"RANGE"}],"Projection":{"ProjectionType":"ALL"}}]'
+        >/dev/null
+    environment:
+      <<: *aws
+    depends_on:
+      ministack:
+        condition: service_healthy
+
+  os-postgres:
+    image: postgres:18-alpine
+    container_name: oficina-demo-os-postgres
+    environment:
+      POSTGRES_DB: oficina
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d oficina"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  execution-postgres:
+    image: postgres:18-alpine
+    container_name: oficina-demo-execution-postgres
+    environment:
+      POSTGRES_DB: execution
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d execution"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    container_name: oficina-demo-mailhog
+    ports:
+      - "8025:8025"
+
+  # Imitação da API de Orders: atende como api.mercadopago.com dentro da rede da demo.
+  mercado-pago-falso:
+    image: node:25-alpine3.22
+    container_name: oficina-demo-mercado-pago-falso
+    command: ["node", "/demo/mercado-pago-falso.cjs"]
+    volumes:
+      - ${OS_DIR}/dev/demo:/demo:ro
+      - ${CERTS_DIR:?rode via scripts/ambiente-demo-local.sh}:/certs:ro
+    ports:
+      - "8090:8090"
+    networks:
+      default:
+        aliases:
+          - api.mercadopago.com
+
+  os-service:
+    image: oficina-demo-os:local
+    container_name: oficina-demo-os-service
+    ports:
+      - "3000:3000"
+    environment:
+      <<: [*aws, *segredos]
+      PORT: 3000
+      DATABASE_URL: postgresql://postgres:password@os-postgres:5432/oficina
+      JWT_EXPIRES_IN: 8h
+      ADMIN_BOOTSTRAP_EMAIL: ${ADMIN_EMAIL:-admin@oficina.local}
+      ADMIN_BOOTSTRAP_PASSWORD: ${ADMIN_SENHA:-ChangeMe!123}
+      SMTP_HOST: mailhog
+      SMTP_PORT: 1025
+      SMTP_FROM: oficina@localhost
+      SQS_EXECUCAO_COMANDOS_URL: http://ministack:4566/000000000000/oficina-local-execucao-comandos
+      SQS_BILLING_COMANDOS_URL: http://ministack:4566/000000000000/oficina-local-billing-comandos
+      SQS_OS_ORQUESTRADOR_EVENTOS_URL: http://ministack:4566/000000000000/oficina-local-os-orquestrador-eventos
+      SQS_DLQ_URLS: http://ministack:4566/000000000000/oficina-local-execucao-comandos-dlq,http://ministack:4566/000000000000/oficina-local-billing-comandos-dlq,http://ministack:4566/000000000000/oficina-local-os-orquestrador-eventos-dlq
+      PRAZO_APROVACAO: 30
+      PRAZO_PAGAMENTO: 30
+      PRAZO_RESPOSTA_SERVICO: 5
+    depends_on:
+      os-postgres:
+        condition: service_healthy
+      mensageria-init:
+        condition: service_completed_successfully
+
+  billing-service:
+    image: oficina-demo-billing:local
+    build: ${BILLING_DIR:?rode via scripts/ambiente-demo-local.sh}
+    container_name: oficina-demo-billing-service
+    ports:
+      - "3002:3000"
+    environment:
+      <<: [*aws, *segredos]
+      PORT: 3000
+      NODE_ENV: production
+      DYNAMODB_TABLE: oficina-billing-local
+      SQS_BILLING_COMANDOS_URL: http://ministack:4566/000000000000/oficina-local-billing-comandos
+      # Vazio = GatewayPagamentoSimulado; preenchido = gateway real contra a API imitada (nunca um token real).
+      MERCADO_PAGO_ACCESS_TOKEN: ${MERCADO_PAGO_ACCESS_TOKEN_DEMO:-}
+      MERCADO_PAGO_WEBHOOK_SECRET: ${MERCADO_PAGO_WEBHOOK_SECRET:-segredo-local}
+      NODE_EXTRA_CA_CERTS: /certs/ca.crt
+    volumes:
+      - ${CERTS_DIR}:/certs:ro
+    depends_on:
+      mensageria-init:
+        condition: service_completed_successfully
+      dynamodb-init:
+        condition: service_completed_successfully
+
+  execution-service:
+    image: oficina-demo-execution:local
+    build: ${EXECUCAO_DIR:?rode via scripts/ambiente-demo-local.sh}
+    container_name: oficina-demo-execution-service
+    # A imagem não aplica as migrations sozinha.
+    command: ["sh", "-c", "npx prisma migrate deploy && exec node dist/src/main.js"]
+    ports:
+      - "3001:3000"
+    environment:
+      <<: [*aws, *segredos]
+      PORT: 3000
+      DATABASE_URL: postgresql://postgres:password@execution-postgres:5432/execution
+      OS_SERVICE_URL: http://os-service:3000
+      SQS_EXECUCAO_COMANDOS_URL: http://ministack:4566/000000000000/oficina-local-execucao-comandos
+    depends_on:
+      execution-postgres:
+        condition: service_healthy
+      mensageria-init:
+        condition: service_completed_successfully
