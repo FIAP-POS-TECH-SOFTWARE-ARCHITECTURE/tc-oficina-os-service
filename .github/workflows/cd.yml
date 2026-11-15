@@ -119,8 +119,6 @@ jobs:
           LOGS=$(kubectl logs deployment/os-service -n "$ENV" --since=10m)
           grep -q mensageria.consumidor_iniciado <<< "$LOGS" || { echo "consumidor não iniciou"; exit 1; }
           aws ssm put-parameter --name "/oficina/$ENV/os-service-lb-hostname" --value "$URL" --type String --overwrite
-          # Escrita dupla até o gateway ler o nome novo; removida depois que a borda migrar.
-          aws ssm put-parameter --name "/oficina/$ENV/app-lb-hostname" --value "$URL" --type String --overwrite
           echo "hostname=$URL" >> "$GITHUB_OUTPUT"
           echo "Ambiente $ENV disponível em http://$URL"
 
