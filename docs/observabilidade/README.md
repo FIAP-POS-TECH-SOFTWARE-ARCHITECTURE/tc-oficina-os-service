@@ -38,7 +38,7 @@ O dashboard `Fluxo da OS` consome os logs `fluxo.iniciado`, `fluxo.transicao`, `
 - "Tempo médio por etapa" faceta por `etapaAnterior` e usa `duracaoEtapaMs`, que mede o tempo desde a última gravação do fluxo (`updatedAt`). Isso costuma coincidir com a última mudança de etapa, mas não é garantido: qualquer gravação do fluxo (por exemplo, a de um reenvio) zera a contagem.
 - "Throughput de mensagens consumidas" filtra `OtherTransaction/SQS/mensageria/%`: o consumidor abre uma transação em background com nome `mensageria/<tipo>` e grupo `SQS`, e o agente a registra como `OtherTransaction/SQS/mensageria/<tipo>`.
 - O p95 de latência dos três serviços inclui as transações de background do consumidor SQS (`OtherTransaction/SQS/mensageria/*`); para ver só HTTP, acrescentar `AND transactionType = 'Web'` à query do widget.
-- "Estornos esgotados" (`billing.estorno.esgotado`) fica zerado até a integração de pagamento do billing existir.
+- "Estornos esgotados" (`billing.estorno.esgotado`) conta os estornos que falharam no Mercado Pago depois do último degrau do backoff (1, 5, 15 e 60 min); o billing segue tentando de hora em hora, mas cada ocorrência pede acompanhamento humano.
 - "Mensagens fora do contrato" soma os três serviços (filtra só por namespace) e usa `uniqueCount(sqsMessageId)` sobre os eventos `mensageria.mensagem_invalida` (os-service e execution) e `mensageria.mensagem.fora-do-contrato` (billing), para não contar em dobro a linha ingerida pelas duas rotas (seção 6); os demais widgets de log filtram o `os-service`.
 
 **Antes de importar**: os JSONs já trazem o `accountIds` da conta (8421772); só é preciso trocar se a conta mudar (o ID aparece na URL `one.newrelic.com/.../accounts/<ID>`).

@@ -31,7 +31,7 @@ DynamoDB e SSM sem depender da conta do AWS Academy, que expira por sessão.
     Execution (caminho feliz, orçamento rejeitado, reparo inviável com estorno, bloqueio por
     estoque, prazo de aprovação expirado, pagamento atrasado estornado, mensagem duplicada) — e
     `fluxo-estados-os.feature`;
-  - `tc-oficina-billing-service`: `aprovacao-orcamento.feature`;
+  - `tc-oficina-billing-service`: `aprovacao-orcamento.feature` e `pagamento.feature`;
   - `tc-oficina-execution-service`: `fila-reparo.feature`.
 - **MiniStack no lugar do LocalStack** como emulador AWS local: imagem
   `ministackorg/ministack` no `dev/docker-compose.yml` (desenvolvimento, `npm run ministack:up`)
