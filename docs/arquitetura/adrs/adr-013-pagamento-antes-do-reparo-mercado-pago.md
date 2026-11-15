@@ -19,14 +19,19 @@ compensação de um reparo inviável inclui devolver o dinheiro.
   `IniciarReparo`. É o último passo antes do reparo (Visão Pessimista, ver ADR-008). Se o reparo
   se mostrar inviável (`ReparoInviavel`), a compensação estorna o pagamento
   (`EstornarPagamento`), cancela o orçamento e estorna a reserva de estoque.
-- **Mercado Pago Checkout Pro**: na aprovação, o Billing cria uma preferência de pagamento e
-  devolve ao cliente o `linkPagamento`. A preferência expira junto com o prazo de pagamento da
-  Saga, para que um pagamento não seja aceito depois de o fluxo desistir.
+- **Mercado Pago Checkout Pro, pela API de Orders**: na aprovação, o Billing cria uma order
+  (`external_reference` = id do orçamento, chave de idempotência `order-<orcamentoId>`) e
+  devolve ao cliente o `checkout_url` como `linkPagamento`. A order expira junto com o prazo de
+  pagamento da Saga (`expiration_time`), para que um pagamento não seja aceito depois de o fluxo
+  desistir; meios de pagamento offline (boleto, lotérica) ficam de fora porque podem aprovar
+  depois do prazo.
 - **Webhook assinado + consulta à API**: o Mercado Pago notifica
   `POST /billing/webhooks/mercado-pago` (rota pública no API Gateway, sem authorizer). O Billing
   valida o header `x-signature` e **não confia no payload**: consulta o pagamento na API do
   Mercado Pago antes de registrar o resultado. A notificação é deduplicada (item
-  `WEBHOOK#<pagamentoId>#<status>`) e só então sai `PagamentoConfirmado`.
+  `WEBHOOK#<pagamentoId>#<status>`) e só então sai `PagamentoConfirmado`. Se a notificação se
+  perder, a equipe aciona a reconciliação (`POST /billing/orcamentos/:numeroOs/reconciliar`),
+  que busca as orders do orçamento e aplica as mesmas regras.
 - **Estorno automático de pagamento não aplicável**: pagamento que chega para um orçamento que
   não pode recebê-lo (por exemplo ainda aguardando aprovação ou rejeitado), duplicado ou com
   valor divergente é estornado pelo próprio Billing. Pagamento que chega depois de o orçamento
@@ -57,17 +62,15 @@ compensação de um reparo inviável inclui devolver o dinheiro.
   "reparo inviável" do Execution.
 - **Positivo:** a porta isola o domínio do provedor: trocar ou simular o provedor não muda
   orçamento, eventos nem testes do fluxo.
-- **Estado atual:** o adapter em uso hoje é **simulado** (`gateway-pagamento.simulado.ts`, atrás
-  da `GatewayPagamentoPort`) e não movimenta dinheiro. O Mercado Pago é o adapter-alvo da mesma
-  porta; o controller do webhook ainda não existe no Billing, embora a rota pública já esteja
-  declarada no API Gateway (`tc-oficina-lambda-auth`). Com o adapter simulado, nenhum
-  componente produz `PagamentoConfirmado`: o fluxo depois da aprovação é exercitado pelos testes
-  do orquestrador (unitários e o BDD `fluxo-ordem-servico.feature`), que injetam o evento. O estado `ESTORNO_PENDENTE` e a
-  transição de falha de estorno existem no domínio do orçamento, mas a retentativa agendada e a
-  publicação de `EstornoFalhou` acompanham o adapter Mercado Pago; hoje, uma falha do gateway
-  durante `EstornarPagamento` faz a mensagem voltar à fila e, após 5 recebimentos, ir para a
-  DLQ. O orquestrador já trata `EstornoFalhou`.
+- **Positivo:** o provedor é escolhido na subida do Billing. Com `MERCADO_PAGO_ACCESS_TOKEN` ele
+  usa o adapter do Mercado Pago; sem o token usa um adapter simulado
+  (`gateway-pagamento.simulado.ts`), que não movimenta dinheiro e mantém o ambiente local e os
+  testes BDD sem conta externa.
+- **Implementação:** a retentativa do estorno usa intervalos de 1, 5, 15 e 60 minutos e, depois
+  disso, continua de hora em hora com um log de erro para acompanhamento humano. Um estorno que
+  falha mas já aparece como reembolsado no Mercado Pago (feito pelo painel, por exemplo) conta
+  como concluído.
 - **Negativo:** cobrar antes do reparo pede confiança do cliente e exige estorno quando o reparo
   não acontece; o estorno depende da disponibilidade do Mercado Pago, por isso é retentável.
 - **Negativo:** a corrida entre o pagamento e o prazo não some: é reduzida pela expiração da
-  preferência e coberta pela regra do pagamento atrasado (estorno).
+  order e coberta pela regra do pagamento atrasado (estorno).

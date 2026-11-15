@@ -52,8 +52,9 @@ Os diagramas do caminho feliz e das compensações estão em
 | 6 | **`PagamentoConfirmado`** → `IniciarReparo` | billing → os → execution | `EM_EXECUCAO` | **Fim da compensação automática por falha técnica.** Daqui em diante, comando sem confirmação no prazo leva o fluxo a `FALHA_TECNICA` (decisão humana). Só a falha **de negócio** `ReparoInviavel` compensa sozinha: `EstornarPagamento`, `CancelarOrcamento`, estorno da reserva; o cancelamento pela equipe (`ADMINISTRADOR`) também dispara `CancelarExecucao`, `EstornarPagamento`, `CancelarOrcamento` e o estorno da reserva |
 | 7 | **`ReparoConcluido`** | execution → os | `FINALIZADA` | **Ponto sem volta:** reparo feito e pago não se desfaz; `FINALIZADA` não é cancelável. O que vem depois (`FluxoConcluido`, entrega) só é retentável |
 
-Com o adapter de pagamento simulado em uso hoje, `PagamentoConfirmado` só é produzido pelos
-testes do orquestrador (ver [ADR-013](adr-013-pagamento-antes-do-reparo-mercado-pago.md)).
+`PagamentoConfirmado` sai do Billing quando o webhook do Mercado Pago confirma o pagamento, ou
+quando a equipe reconcilia um orçamento cuja notificação se perdeu (ver
+[ADR-013](adr-013-pagamento-antes-do-reparo-mercado-pago.md)).
 
 Regras que completam a tabela:
 

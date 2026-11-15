@@ -64,11 +64,12 @@ sequenceDiagram
     Note over CL: o cliente é avisado pela notificação de mudança de status da OS
 ```
 
-Com o adapter Mercado Pago, uma falha de estorno no provedor fará o billing responder
-`EstornoFalhou { proximaTentativaEm }` e reagendar a tentativa; o orquestrador já trata esse
-evento (adia o prazo e registra `fluxo.estorno_falhou`). Hoje, com o adapter simulado, a falha
-faz a mensagem voltar à fila (DLQ após 5 recebimentos), e o orquestrador reenvia a compensação
-até 3 vezes antes de `FALHA_TECNICA`.
+Se o estorno falhar no Mercado Pago, o billing deixa o orçamento em `ESTORNO_PENDENTE`, responde
+`EstornoFalhou { proximaTentativaEm }` e tenta de novo sozinho (1, 5, 15 e 60 minutos, depois de
+hora em hora); quando consegue, publica `PagamentoEstornado`. O orquestrador trata
+`EstornoFalhou` adiando o prazo e registrando `fluxo.estorno_falhou`, sem reenviar o comando. Se
+o billing não responder nada (fora do ar), o orquestrador reenvia a compensação até 3 vezes
+antes de `FALHA_TECNICA`.
 
 ## (b) Pagamento atrasado
 
@@ -104,14 +105,10 @@ sequenceDiagram
 ```
 
 Quando o pagamento chega atrasado, o billing o registra sobre o orçamento já `CANCELADO`
-(`pagamentoAtrasado = true`) — comportamento que depende do webhook do adapter real. No
-orquestrador, o mesmo `pagamentoId` entregue duas vezes é ignorado.
-
-> **Mercado Pago:** o adapter de pagamento do billing hoje é simulado
-> (`gateway-pagamento.simulado.ts`, atrás de `GatewayPagamentoPort`), e não há controller de
-> webhook. A chegada do `PagamentoConfirmado` e o estorno no provedor são o comportamento
-> esperado do adapter real; no código atual o estorno é simulado e o evento de pagamento só é
-> construído pelos testes.
+(`pagamentoAtrasado = true`) quando a notificação do Mercado Pago chega pelo webhook. No
+orquestrador, o mesmo `pagamentoId` entregue duas vezes é ignorado. A order do Mercado Pago
+expira junto com o prazo de pagamento, o que torna esse caso raro; ele existe para a corrida
+entre o pagamento e o job de prazos.
 
 ## Tabela de compensações como implementada
 

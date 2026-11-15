@@ -112,14 +112,13 @@ O estado do fluxo (`StatusFluxoOs`) é separado da etapa: `EM_ANDAMENTO`, `COMPE
 - **Idempotência.** Cada mensagem tem `messageId`; o orquestrador registra as processadas e
   descarta duplicatas, lê o fluxo sob `SELECT ... FOR UPDATE` (rever o valor antes de
   atualizar) e ignora eventos que não fazem sentido na etapa atual (SQS não garante ordem).
-- **Mercado Pago.** O adapter de pagamento do `billing-service` hoje é **simulado**
-  (`gateway-pagamento.simulado.ts`, atrás da porta `GatewayPagamentoPort`); o Mercado Pago é o
-  adapter-alvo da mesma porta. Por isso o diagrama mostra a criação da cobrança e a
-  notificação de pagamento como o desenho final. No código atual a cobrança devolve um link
-  simulado, não há controller de webhook e nenhum fluxo do billing publica
-  `PagamentoConfirmado` (só os testes constroem esse evento); o passo 3 do diagrama é,
-  portanto, o comportamento esperado do adapter real. O contrato do evento e a reação do
-  orquestrador já existem e não mudam quando ele entrar.
+- **Mercado Pago.** Na aprovação o `billing-service` cria uma order do Checkout Pro (API de
+  Orders) que expira em `prazoPagamentoEm`, e o `linkPagamento` é o `checkout_url` dela. A
+  notificação do passo 3 chega em `POST /billing/webhooks/mercado-pago`, que valida o
+  `x-signature` e consulta a order na API antes de publicar `PagamentoConfirmado`. Se a
+  notificação se perder, a equipe chama `POST /billing/orcamentos/{numeroOs}/reconciliar`. Sem
+  token do Mercado Pago (ambiente local e testes), o billing usa um adapter simulado atrás da
+  mesma porta `GatewayPagamentoPort`.
 - **Mecânico e atendente.** As filas do `execution-service` são consumidas por mecânicos via
   HTTP (`fila/{etapa}/proxima`), não por worker automático. A entrega (`ENTREGUE`) é uma ação
   do atendente depois que o fluxo já terminou.
