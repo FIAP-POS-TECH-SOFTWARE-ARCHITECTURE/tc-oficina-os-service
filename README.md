@@ -269,6 +269,10 @@ run verde do CI do PR que levou esta versão à `develop` (lint, build, testes u
 e2e com integração e o job do quality gate) está em
 [actions/runs/41743782970](https://github.com/FIAP-POS-TECH-SOFTWARE-ARCHITECTURE/tc-oficina-os-service/actions/runs/41743782970).
 
+Análise no SonarQube com o mesmo script e o mesmo gate (`npm run sonar:scan`): quality gate aprovado, cobertura geral de 94,9% (o Sonar combina linhas e condições num número só, por isso difere da tabela acima).
+
+![Quality gate aprovado no SonarQube](docs/evidencias/sonar.png)
+
 ## Deploy ✱
 
 | Workflow | Gatilho | O que faz |
