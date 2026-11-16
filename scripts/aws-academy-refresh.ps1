@@ -7,6 +7,8 @@ $ErrorActionPreference = "Stop"
 
 Write-Host "Cole o bloco [default] do AWS Details (finalize com Ctrl+Z + Enter):"
 $block = [Console]::In.ReadToEnd()
+# Remove o Ctrl+Z (0x1A) que o console grava quando ele é digitado no fim da última linha
+$block = $block -replace "\x1A", ""
 
 if ($block -notmatch "aws_access_key_id\s*=\s*(\S+)") { throw "aws_access_key_id não encontrado no bloco colado" }
 $accessKey = $Matches[1]
@@ -56,4 +58,5 @@ foreach ($repo in $repos) {
 }
 
 aws sts get-caller-identity
+if ($LASTEXITCODE -ne 0) { throw "sts get-caller-identity falhou: confira o bloco colado" }
 Write-Host "Credenciais válidas. Pronto."
