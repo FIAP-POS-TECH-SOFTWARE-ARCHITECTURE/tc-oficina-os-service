@@ -7,7 +7,7 @@ metadata:
 data:
   PORT: "3000"
   JWT_EXPIRES_IN: "8h"
-  SMTP_HOST: "mailhog"        # em produção: host SMTP real (sobrescrever)
+  SMTP_HOST: "os-service-mailhog" # SMTP de teste no cluster (os-service-mailhog.yaml)
   SMTP_PORT: "1025"
   SMTP_FROM: "oficina@localhost"
   AWS_REGION: "us-east-1"
