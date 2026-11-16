@@ -35,7 +35,18 @@ Checklist requisito → evidência:
 
 ## 3. Vídeo de demonstração
 
-PREENCHER: link do YouTube (não listado) e duração final (MM:SS, até 15:00).
+<https://www.youtube.com/watch?v=Sf_hejh9kxk> (não listado, 14:38).
+
+| Início | Bloco |
+|---|---|
+| 0:04 | Arquitetura geral |
+| 1:01 | Microsserviços e bancos |
+| 2:24 | Saga orquestrada |
+| 4:22 | Fluxo completo de uma OS, com pagamento no Mercado Pago |
+| 6:55 | Falha e compensação (reparo inviável, estorno, DLQ e alerta) |
+| 9:14 | Deploy automatizado |
+| 11:23 | Monitoramento e rastreamento |
+| 13:55 | Encerramento |
 
 O vídeo cobre, nesta ordem: fluxo completo de uma OS passando pelos três microsserviços (com
 pagamento no Mercado Pago), execução da Saga com compensação e tratamento de falhas, deploy
@@ -204,7 +215,14 @@ Relatórios de cobertura:
 [billing-service](https://github.com/FIAP-POS-TECH-SOFTWARE-ARCHITECTURE/tc-oficina-billing-service/blob/main/docs/evidencias/cobertura.png) ·
 [execution-service](https://github.com/FIAP-POS-TECH-SOFTWARE-ARCHITECTURE/tc-oficina-execution-service/blob/main/docs/evidencias/cobertura.png).
 
-PREENCHER: link do run verde do CI de `main` de cada serviço (com o job de qualidade).
+CI verde no PR de promoção `develop → main` de cada serviço, com o job de qualidade:
+[os-service](https://github.com/FIAP-POS-TECH-SOFTWARE-ARCHITECTURE/tc-oficina-os-service/actions/runs/43785127324) ·
+[billing-service](https://github.com/FIAP-POS-TECH-SOFTWARE-ARCHITECTURE/tc-oficina-billing-service/actions/runs/43785131215) ·
+[execution-service](https://github.com/FIAP-POS-TECH-SOFTWARE-ARCHITECTURE/tc-oficina-execution-service/actions/runs/43785134525).
+CD de produção disparado pelo merge na `main`:
+[os-service](https://github.com/FIAP-POS-TECH-SOFTWARE-ARCHITECTURE/tc-oficina-os-service/actions/runs/43965593486) ·
+[billing-service](https://github.com/FIAP-POS-TECH-SOFTWARE-ARCHITECTURE/tc-oficina-billing-service/actions/runs/43967804295) ·
+[execution-service](https://github.com/FIAP-POS-TECH-SOFTWARE-ARCHITECTURE/tc-oficina-execution-service/actions/runs/43965620545).
 
 ## 8. Observabilidade
 
@@ -218,9 +236,17 @@ serviços; a política de alertas cobre mensagem em DLQ, fluxo em falha técnica
 travada e estorno esgotado. Runbook, dashboards versionados e alertas:
 <https://github.com/FIAP-POS-TECH-SOFTWARE-ARCHITECTURE/tc-oficina-os-service/tree/main/docs/observabilidade>.
 
-PREENCHER: print do trace distribuído de um fluxo completo atravessando os três serviços.
+Dashboard `Oficina — Fluxo da OS`, página Homolog, depois dos fluxos da demonstração (5 compensados
+e 2 concluídos, compensações por motivo e tempo médio por etapa):
 
-PREENCHER: print do dashboard `Oficina — Fluxo da OS` (página Homolog) depois de um fluxo
-completo.
+![Dashboard Fluxo da OS](../evidencias/newrelic-dashboard-fluxo-os.png)
 
-PREENCHER: print do alerta "Mensagem em DLQ" disparado (issue aberta no New Relic).
+Distributed tracing do `oficina-os-service-homolog`: as rotas do fluxo aparecem em traces com 2 e 3
+entidades (por exemplo, o webhook do Mercado Pago e o reparo inviável atravessam três serviços):
+
+![Trace distribuído](../evidencias/newrelic-trace-distribuido.png)
+
+Alerta "Mensagem em DLQ" disparado em homolog (mensagem inválida publicada na fila do billing),
+com a issue crítica aberta e notificada por e-mail:
+
+![Alerta de DLQ](../evidencias/newrelic-alerta-dlq.png)
