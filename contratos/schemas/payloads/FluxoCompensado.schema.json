@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://oficina.local/contratos/schemas/payloads/FluxoCompensado.schema.json",
+  "title": "FluxoCompensado",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "motivo",
+    "compensacoes"
+  ],
+  "properties": {
+    "motivo": {
+      "$ref": "https://oficina.local/contratos/schemas/envelope.schema.json#/$defs/texto"
+    },
+    "compensacoes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

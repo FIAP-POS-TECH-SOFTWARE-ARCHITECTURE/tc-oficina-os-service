@@ -20,6 +20,7 @@ model OrdemServico {
   itensInsumo    OsItemInsumo[]
   historico      OsHistoricoStatus[]
   movimentos     MovimentoEstoque[]
+  fluxo          FluxoOrdemServico?
   compras        RegistroCompra[]
 
   @@index([clienteId])

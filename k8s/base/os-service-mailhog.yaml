@@ -1,0 +1,50 @@
+# Servidor SMTP de teste do os-service: recebe os e-mails de notificação da OS
+# (sem entregar a ninguém) e mostra na interface web, porta 8025:
+#   kubectl port-forward svc/os-service-mailhog 8025:8025 -n <ambiente>
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: os-service-mailhog
+  labels:
+    app: os-service-mailhog
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: os-service-mailhog
+  template:
+    metadata:
+      labels:
+        app: os-service-mailhog
+    spec:
+      containers:
+        - name: mailhog
+          image: mailhog/mailhog:v1.0.1
+          ports:
+            - containerPort: 1025 # SMTP
+            - containerPort: 8025 # interface web
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: os-service-mailhog
+  labels:
+    app: os-service-mailhog
+spec:
+  type: ClusterIP
+  selector:
+    app: os-service-mailhog
+  ports:
+    - name: smtp
+      port: 1025
+      targetPort: 1025
+    - name: web
+      port: 8025
+      targetPort: 8025

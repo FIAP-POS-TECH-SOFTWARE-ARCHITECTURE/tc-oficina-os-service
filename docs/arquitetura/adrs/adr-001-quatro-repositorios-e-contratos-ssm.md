@@ -3,6 +3,13 @@
 - **Status:** Aceita
 - **Data:** 2026-09-10
 
+> **Atualização na Fase 4:** o contrato via SSM continua, mas o `tc-oficina-app` virou
+> `tc-oficina-os-service` e surgiram o billing e o execution
+> ([ADR-007](adr-007-microsservicos-os-billing-execution.md)). Cada serviço publica o próprio
+> `/oficina/<env>/<servico>-lb-hostname` (`os-service`, `billing-service`, `execution-service`)
+> e o `tc-oficina-lambda-auth` lê esses parâmetros; o `app-lb-hostname` citado abaixo deixou
+> de ser publicado.
+
 ## Contexto
 
 A Fase 3 exige repositórios separados com CI/CD independente para a aplicação, a Lambda de

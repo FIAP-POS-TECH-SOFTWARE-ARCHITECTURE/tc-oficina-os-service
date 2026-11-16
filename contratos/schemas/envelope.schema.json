@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://oficina.local/contratos/schemas/envelope.schema.json",
+  "title": "Envelope de mensagem entre microsservicos da oficina",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "messageId",
+    "tipo",
+    "versao",
+    "ocorridoEm",
+    "origem",
+    "fluxoId",
+    "osId",
+    "numeroOs",
+    "correlationId",
+    "payload"
+  ],
+  "properties": {
+    "messageId": {
+      "$ref": "#/$defs/uuid"
+    },
+    "tipo": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Za-z]+$"
+    },
+    "versao": {
+      "const": 1
+    },
+    "ocorridoEm": {
+      "$ref": "#/$defs/dataHora"
+    },
+    "origem": {
+      "enum": [
+        "os",
+        "billing",
+        "execution"
+      ]
+    },
+    "fluxoId": {
+      "$ref": "#/$defs/uuid"
+    },
+    "osId": {
+      "$ref": "#/$defs/uuid"
+    },
+    "numeroOs": {
+      "type": "string",
+      "minLength": 1
+    },
+    "correlationId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "payload": {
+      "type": "object"
+    }
+  },
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "dataHora": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "centavos": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "texto": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2000
+    },
+    "tipoItem": {
+      "enum": [
+        "SERVICO",
+        "INSUMO"
+      ]
+    },
+    "etapaExecucao": {
+      "enum": [
+        "DIAGNOSTICO",
+        "REPARO"
+      ]
+    }
+  }
+}

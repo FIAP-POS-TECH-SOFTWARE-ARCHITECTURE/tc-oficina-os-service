@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: os-service-config
+  labels:
+    app: os-service
+data:
+  PORT: "3000"
+  JWT_EXPIRES_IN: "8h"
+  SMTP_HOST: "os-service-mailhog" # SMTP de teste no cluster (os-service-mailhog.yaml)
+  SMTP_PORT: "1025"
+  SMTP_FROM: "oficina@localhost"
+  AWS_REGION: "us-east-1"
+  PRAZO_APROVACAO: "4320"
+  PRAZO_PAGAMENTO: "2880"
+  PRAZO_RESPOSTA_SERVICO: "10"

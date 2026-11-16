@@ -2,6 +2,7 @@ import { OsStatus } from "./os-status";
 
 export const PRIORIDADE_LISTAGEM: OsStatus[] = [
 	OsStatus.EM_EXECUCAO,
+	OsStatus.AGUARDANDO_PAGAMENTO,
 	OsStatus.AGUARDANDO_APROVACAO,
 	OsStatus.EM_DIAGNOSTICO,
 	OsStatus.RECEBIDA,

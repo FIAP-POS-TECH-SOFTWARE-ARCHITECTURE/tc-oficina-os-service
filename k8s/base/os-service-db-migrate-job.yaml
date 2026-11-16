@@ -1,0 +1,18 @@
+# Fora dos resources do kustomize (k8s/base); a pipeline o aplica separadamente por ambiente, com a imagem do commit.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: os-service-db-migrate
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: migrate
+          image: PLACEHOLDER_IMAGE
+          command: ["npx", "prisma", "migrate", "deploy"]
+          envFrom:
+            - secretRef:
+                name: os-service-secrets

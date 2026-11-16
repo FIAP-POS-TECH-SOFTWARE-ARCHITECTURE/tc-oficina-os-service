@@ -58,8 +58,27 @@ export class InsumosPrismaGateway implements InsumosGatewayPort {
 		});
 	}
 
+	// Soma atômica no banco: o saldo lido pelo caso de uso pode estar desatualizado por uma
+	// reserva concorrente; anterior/posterior do movimento saem da linha já atualizada.
 	registrarEntrada(dados: MovimentoEstoqueDados): Promise<Insumo> {
-		return this.registrarMovimento(TipoMovimentoEstoque.ENTRADA, dados);
+		return this.prisma.$transaction(async (tx) => {
+			const u = await tx.insumo.update({
+				where: { id: dados.insumoId },
+				data: { quantidadeEstoque: { increment: dados.quantidade } },
+			});
+			await tx.movimentoEstoque.create({
+				data: {
+					insumoId: dados.insumoId,
+					tipo: TipoMovimentoEstoque.ENTRADA,
+					quantidade: dados.quantidade,
+					quantidadeAnterior: u.quantidadeEstoque - dados.quantidade,
+					quantidadePosterior: u.quantidadeEstoque,
+					motivo: dados.motivo,
+					usuarioId: dados.usuarioId,
+				},
+			});
+			return u;
+		});
 	}
 
 	registrarAjuste(dados: MovimentoEstoqueDados): Promise<Insumo> {

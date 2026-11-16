@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://oficina.local/contratos/schemas/payloads/ExecucaoEnfileirada.schema.json",
+  "title": "ExecucaoEnfileirada",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "etapa",
+    "ordemExecucaoId"
+  ],
+  "properties": {
+    "etapa": {
+      "$ref": "https://oficina.local/contratos/schemas/envelope.schema.json#/$defs/etapaExecucao"
+    },
+    "ordemExecucaoId": {
+      "$ref": "https://oficina.local/contratos/schemas/envelope.schema.json#/$defs/uuid"
+    }
+  }
+}

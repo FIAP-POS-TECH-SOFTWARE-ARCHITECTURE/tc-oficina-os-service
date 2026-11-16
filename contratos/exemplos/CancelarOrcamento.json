@@ -1,0 +1,14 @@
+{
+  "messageId": "9b4c8d0a-1a3f-4e6d-9f0c-4d6e8a9b1c82",
+  "tipo": "CancelarOrcamento",
+  "versao": 1,
+  "ocorridoEm": "2026-10-20T16:06:00.000Z",
+  "origem": "os",
+  "fluxoId": "3f2a1c9e-8b7d-4e6f-a5b4-c3d2e1f0a9b8",
+  "osId": "9c8b7a6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d",
+  "numeroOs": "OS-2026-000123",
+  "correlationId": "req-5f1e2d3c",
+  "payload": {
+    "motivo": "Reparo declarado inviavel pela execucao."
+  }
+}

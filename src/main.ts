@@ -11,14 +11,26 @@ import { JwtAuthGuard } from "./common/guards/jwt-auth.guard";
 import { RolesGuard } from "./common/guards/roles.guard";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { PrismaService } from "./prisma/prisma.service";
+import { deveIgnorarRateLimit } from "./common/http/rate-limit";
+import { configurarRoteamento } from "./common/http/roteamento";
+import { INTERNAL_API_KEY_HEADER, INTERNAL_API_KEY_SECURITY } from "./common/guards/internal-api-key.guard";
+import { workersHabilitados } from "./modules/mensageria/configuracao-mensageria";
+import { lerPrazos } from "./modules/orquestracao-os/domain/prazos-fluxo";
 
 async function bootstrap() {
 	if (!process.env.PORT) throw new Error("PORT não definido no .env");
 	if (!process.env.JWT_SECRET) throw new Error("JWT_SECRET não definido no .env");
 	if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL não definido no .env");
+	if (!process.env.INTERNAL_API_KEY) throw new Error("INTERNAL_API_KEY não definido no .env");
+	lerPrazos(process.env);
+	if (workersHabilitados())
+		for (const nome of ["SNS_EVENTOS_ARN", "SQS_EXECUCAO_COMANDOS_URL", "SQS_BILLING_COMANDOS_URL", "SQS_OS_ORQUESTRADOR_EVENTOS_URL"])
+			if (!process.env[nome]) throw new Error(`${nome} não definido no .env (ou WORKERS_HABILITADOS=false)`);
 
 	const app = await NestFactory.create(AppModule, { bufferLogs: true });
+	configurarRoteamento(app);
 	app.useLogger(app.get(Logger));
+	app.enableShutdownHooks();
 
 	app.enableCors();
 	app.use(helmet());
@@ -28,8 +40,8 @@ async function bootstrap() {
 			max: 100,
 			standardHeaders: true,
 			legacyHeaders: false,
-			// probes do Kubernetes batem em /health de forma frequente: isentar do rate limit
-			skip: (req) => req.path.startsWith("/health"),
+			// probes do Kubernetes e rotas internas (serviço a serviço, com API key) ficam fora do limite por IP
+			skip: (req) => deveIgnorarRateLimit(req.path),
 		}),
 	);
 
@@ -51,10 +63,11 @@ async function bootstrap() {
 	app.useGlobalFilters(new AllExceptionsFilter());
 
 	const config = new DocumentBuilder()
-		.setTitle("Oficina API")
-		.setDescription("API para Gerenciamento de Oficina Mecânica")
+		.setTitle("Oficina - OS service")
+		.setDescription("Ordens de serviço, cadastros, estoque e rotas internas consumidas pelos demais serviços")
 		.setVersion("")
 		.addBearerAuth()
+		.addApiKey({ type: "apiKey", in: "header", name: INTERNAL_API_KEY_HEADER }, INTERNAL_API_KEY_SECURITY)
 		.build();
 	const document = SwaggerModule.createDocument(app, config);
 	SwaggerModule.setup("/docs", app, document);

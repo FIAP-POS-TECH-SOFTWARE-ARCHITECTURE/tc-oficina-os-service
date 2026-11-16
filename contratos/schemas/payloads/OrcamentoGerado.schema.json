@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://oficina.local/contratos/schemas/payloads/OrcamentoGerado.schema.json",
+  "title": "OrcamentoGerado",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "orcamentoId",
+    "valorTotalCentavos"
+  ],
+  "properties": {
+    "orcamentoId": {
+      "$ref": "https://oficina.local/contratos/schemas/envelope.schema.json#/$defs/uuid"
+    },
+    "valorTotalCentavos": {
+      "type": "integer",
+      "minimum": 1
+    }
+  }
+}

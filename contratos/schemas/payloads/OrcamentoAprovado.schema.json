@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://oficina.local/contratos/schemas/payloads/OrcamentoAprovado.schema.json",
+  "title": "OrcamentoAprovado",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "orcamentoId",
+    "linkPagamento",
+    "prazoPagamentoEm"
+  ],
+  "properties": {
+    "orcamentoId": {
+      "$ref": "https://oficina.local/contratos/schemas/envelope.schema.json#/$defs/uuid"
+    },
+    "linkPagamento": {
+      "type": "string",
+      "format": "uri"
+    },
+    "prazoPagamentoEm": {
+      "$ref": "https://oficina.local/contratos/schemas/envelope.schema.json#/$defs/dataHora"
+    }
+  }
+}

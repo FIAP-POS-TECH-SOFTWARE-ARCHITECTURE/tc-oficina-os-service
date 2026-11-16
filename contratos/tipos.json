@@ -1,0 +1,40 @@
+{
+  "comandos": {
+    "execution": [
+      "SolicitarDiagnostico",
+      "IniciarReparo",
+      "CancelarExecucao"
+    ],
+    "billing": [
+      "GerarOrcamento",
+      "CancelarOrcamento",
+      "EstornarPagamento"
+    ]
+  },
+  "eventos": {
+    "execution": [
+      "ExecucaoEnfileirada",
+      "DiagnosticoIniciado",
+      "DiagnosticoConcluido",
+      "DiagnosticoRejeitado",
+      "ReparoIniciado",
+      "ReparoConcluido",
+      "ReparoInviavel",
+      "ExecucaoCancelada"
+    ],
+    "billing": [
+      "OrcamentoGerado",
+      "FalhaGerarOrcamento",
+      "OrcamentoAprovado",
+      "OrcamentoRejeitado",
+      "OrcamentoCancelado",
+      "PagamentoConfirmado",
+      "PagamentoEstornado",
+      "EstornoFalhou"
+    ],
+    "os": [
+      "FluxoConcluido",
+      "FluxoCompensado"
+    ]
+  }
+}

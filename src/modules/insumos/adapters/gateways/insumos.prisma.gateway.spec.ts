@@ -57,9 +57,9 @@ describe("InsumosPrismaGateway", () => {
 		});
 	});
 
-	it("registrarEntrada grava saldo e movimento ENTRADA na mesma transação", async () => {
+	it("registrarEntrada soma de forma atômica e grava o saldo real no movimento (entrada concorrente com reserva)", async () => {
 		const tx = {
-			insumo: { update: jest.fn().mockResolvedValue({ id: "i1", quantidadeEstoque: 8 }) },
+			insumo: { update: jest.fn().mockResolvedValue({ id: "i1", quantidadeEstoque: 12 }) },
 			movimentoEstoque: { create: jest.fn() },
 		};
 		prisma.$transaction.mockImplementationOnce(async (fn: any) => fn(tx));
@@ -70,15 +70,15 @@ describe("InsumosPrismaGateway", () => {
 			quantidadePosterior: 8,
 			usuarioId: "u1",
 		});
-		expect(r).toEqual({ id: "i1", quantidadeEstoque: 8 });
-		expect(tx.insumo.update).toHaveBeenCalledWith({ where: { id: "i1" }, data: { quantidadeEstoque: 8 } });
+		expect(r).toEqual({ id: "i1", quantidadeEstoque: 12 });
+		expect(tx.insumo.update).toHaveBeenCalledWith({ where: { id: "i1" }, data: { quantidadeEstoque: { increment: 3 } } });
 		expect(tx.movimentoEstoque.create).toHaveBeenCalledWith(
 			expect.objectContaining({
 				data: expect.objectContaining({
 					tipo: TipoMovimentoEstoque.ENTRADA,
 					quantidade: 3,
-					quantidadeAnterior: 5,
-					quantidadePosterior: 8,
+					quantidadeAnterior: 9,
+					quantidadePosterior: 12,
 				}),
 			}),
 		);

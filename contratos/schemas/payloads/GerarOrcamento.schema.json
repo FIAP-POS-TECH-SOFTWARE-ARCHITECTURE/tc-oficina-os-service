@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://oficina.local/contratos/schemas/payloads/GerarOrcamento.schema.json",
+  "title": "GerarOrcamento",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "cliente",
+    "veiculo",
+    "itens",
+    "valorTotalCentavos",
+    "prazoAprovacaoEm",
+    "prazoPagamentoMinutos"
+  ],
+  "properties": {
+    "cliente": {
+      "type": "object",
+      "required": [
+        "id",
+        "nome",
+        "email",
+        "documento"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "https://oficina.local/contratos/schemas/envelope.schema.json#/$defs/uuid"
+        },
+        "nome": {
+          "type": "string",
+          "minLength": 1
+        },
+        "email": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "documento": {
+          "type": "string",
+          "pattern": "^[0-9]{11,14}$"
+        }
+      }
+    },
+    "veiculo": {
+      "type": "object",
+      "required": [
+        "placa",
+        "marca",
+        "modelo"
+      ],
+      "properties": {
+        "placa": {
+          "type": "string",
+          "minLength": 1
+        },
+        "marca": {
+          "type": "string"
+        },
+        "modelo": {
+          "type": "string"
+        }
+      }
+    },
+    "itens": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "tipo",
+          "referenciaId",
+          "descricao",
+          "quantidade",
+          "precoUnitarioCentavos"
+        ],
+        "properties": {
+          "tipo": {
+            "$ref": "https://oficina.local/contratos/schemas/envelope.schema.json#/$defs/tipoItem"
+          },
+          "referenciaId": {
+            "$ref": "https://oficina.local/contratos/schemas/envelope.schema.json#/$defs/uuid"
+          },
+          "descricao": {
+            "type": "string",
+            "minLength": 1
+          },
+          "quantidade": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "precoUnitarioCentavos": {
+            "$ref": "https://oficina.local/contratos/schemas/envelope.schema.json#/$defs/centavos"
+          }
+        }
+      }
+    },
+    "valorTotalCentavos": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "prazoAprovacaoEm": {
+      "$ref": "https://oficina.local/contratos/schemas/envelope.schema.json#/$defs/dataHora"
+    },
+    "prazoPagamentoMinutos": {
+      "type": "integer",
+      "minimum": 1
+    }
+  }
+}

@@ -1,0 +1,617 @@
+{
+  "name": "Oficina — Fluxo da OS",
+  "description": "Acompanhamento da orquestração das ordens de serviço entre OS, Billing e Execution: fluxos por status, compensações, tempo por etapa, filas de mensagens mortas e saúde dos serviços. Uma página por ambiente. Fonte: logs estruturados do orquestrador e da mensageria (fluxo.*, mensageria.*, billing.estorno.esgotado) e Transaction dos três serviços.",
+  "permissions": "PUBLIC_READ_WRITE",
+  "pages": [
+    {
+      "name": "Homolog",
+      "description": "Ambiente de homologação (namespace homolog / appName oficina-*-service-homolog).",
+      "widgets": [
+        {
+          "title": "Fluxos iniciados por dia",
+          "layout": {
+            "column": 1,
+            "row": 1,
+            "width": 8,
+            "height": 3
+          },
+          "linkedEntityGuids": null,
+          "visualization": {
+            "id": "viz.line"
+          },
+          "rawConfiguration": {
+            "legend": {
+              "enabled": true
+            },
+            "nrqlQueries": [
+              {
+                "accountIds": [
+                  8421772
+                ],
+                "query": "SELECT uniqueCount(fluxoId) FROM Log WHERE event = 'fluxo.iniciado' AND (entity.name = 'oficina-os-service-homolog' OR (namespace_name = 'homolog' AND container_name = 'os-service')) SINCE 7 days ago TIMESERIES 1 day"
+              }
+            ],
+            "platformOptions": {
+              "ignoreTimeRange": false
+            },
+            "yAxisLeft": {
+              "zero": true
+            }
+          }
+        },
+        {
+          "title": "Fluxos em falha técnica (24 h)",
+          "layout": {
+            "column": 9,
+            "row": 1,
+            "width": 4,
+            "height": 3
+          },
+          "linkedEntityGuids": null,
+          "visualization": {
+            "id": "viz.billboard"
+          },
+          "rawConfiguration": {
+            "dataFormatters": [],
+            "nrqlQueries": [
+              {
+                "accountIds": [
+                  8421772
+                ],
+                "query": "SELECT uniqueCount(fluxoId) FROM Log WHERE event = 'fluxo.falha_tecnica' AND (entity.name = 'oficina-os-service-homolog' OR (namespace_name = 'homolog' AND container_name = 'os-service')) SINCE 1 day ago"
+              }
+            ],
+            "platformOptions": {
+              "ignoreTimeRange": false
+            },
+            "thresholds": []
+          }
+        },
+        {
+          "title": "Fluxos por status final",
+          "layout": {
+            "column": 1,
+            "row": 4,
+            "width": 4,
+            "height": 3
+          },
+          "linkedEntityGuids": null,
+          "visualization": {
+            "id": "viz.pie"
+          },
+          "rawConfiguration": {
+            "legend": {
+              "enabled": true
+            },
+            "nrqlQueries": [
+              {
+                "accountIds": [
+                  8421772
+                ],
+                "query": "SELECT uniqueCount(fluxoId) FROM Log WHERE event = 'fluxo.transicao' AND status IN ('CONCLUIDO','COMPENSADO','FALHA_TECNICA') AND (entity.name = 'oficina-os-service-homolog' OR (namespace_name = 'homolog' AND container_name = 'os-service')) FACET status SINCE 7 days ago"
+              }
+            ],
+            "platformOptions": {
+              "ignoreTimeRange": false
+            }
+          }
+        },
+        {
+          "title": "Compensações por motivo",
+          "layout": {
+            "column": 5,
+            "row": 4,
+            "width": 4,
+            "height": 3
+          },
+          "linkedEntityGuids": null,
+          "visualization": {
+            "id": "viz.bar"
+          },
+          "rawConfiguration": {
+            "legend": {
+              "enabled": true
+            },
+            "nrqlQueries": [
+              {
+                "accountIds": [
+                  8421772
+                ],
+                "query": "SELECT uniqueCount(fluxoId) FROM Log WHERE event = 'fluxo.transicao' AND status = 'COMPENSANDO' AND (entity.name = 'oficina-os-service-homolog' OR (namespace_name = 'homolog' AND container_name = 'os-service')) FACET motivoCompensacao SINCE 7 days ago"
+              }
+            ],
+            "platformOptions": {
+              "ignoreTimeRange": false
+            }
+          }
+        },
+        {
+          "title": "Tempo médio por etapa (min)",
+          "layout": {
+            "column": 9,
+            "row": 4,
+            "width": 4,
+            "height": 3
+          },
+          "linkedEntityGuids": null,
+          "visualization": {
+            "id": "viz.bar"
+          },
+          "rawConfiguration": {
+            "legend": {
+              "enabled": true
+            },
+            "nrqlQueries": [
+              {
+                "accountIds": [
+                  8421772
+                ],
+                "query": "SELECT average(numeric(duracaoEtapaMs)) / 60000 FROM Log WHERE event = 'fluxo.transicao' AND (entity.name = 'oficina-os-service-homolog' OR (namespace_name = 'homolog' AND container_name = 'os-service')) FACET etapaAnterior SINCE 7 days ago"
+              }
+            ],
+            "platformOptions": {
+              "ignoreTimeRange": false
+            }
+          }
+        },
+        {
+          "title": "Profundidade das DLQs",
+          "layout": {
+            "column": 1,
+            "row": 7,
+            "width": 6,
+            "height": 3
+          },
+          "linkedEntityGuids": null,
+          "visualization": {
+            "id": "viz.line"
+          },
+          "rawConfiguration": {
+            "legend": {
+              "enabled": true
+            },
+            "nrqlQueries": [
+              {
+                "accountIds": [
+                  8421772
+                ],
+                "query": "SELECT latest(numeric(mensagens)) FROM Log WHERE event = 'mensageria.dlq_profundidade' AND (entity.name = 'oficina-os-service-homolog' OR (namespace_name = 'homolog' AND container_name = 'os-service')) FACET fila SINCE 6 hours ago TIMESERIES"
+              }
+            ],
+            "platformOptions": {
+              "ignoreTimeRange": false
+            },
+            "yAxisLeft": {
+              "zero": true
+            }
+          }
+        },
+        {
+          "title": "Mensagens fora do contrato (3 serviços)",
+          "layout": {
+            "column": 7,
+            "row": 7,
+            "width": 3,
+            "height": 3
+          },
+          "linkedEntityGuids": null,
+          "visualization": {
+            "id": "viz.billboard"
+          },
+          "rawConfiguration": {
+            "dataFormatters": [],
+            "nrqlQueries": [
+              {
+                "accountIds": [
+                  8421772
+                ],
+                "query": "SELECT uniqueCount(sqsMessageId) FROM Log WHERE event IN ('mensageria.mensagem_invalida', 'mensageria.mensagem.fora-do-contrato') AND namespace_name = 'homolog' SINCE 1 day ago"
+              }
+            ],
+            "platformOptions": {
+              "ignoreTimeRange": false
+            },
+            "thresholds": []
+          }
+        },
+        {
+          "title": "Estornos esgotados",
+          "layout": {
+            "column": 10,
+            "row": 7,
+            "width": 3,
+            "height": 3
+          },
+          "linkedEntityGuids": null,
+          "visualization": {
+            "id": "viz.billboard"
+          },
+          "rawConfiguration": {
+            "dataFormatters": [],
+            "nrqlQueries": [
+              {
+                "accountIds": [
+                  8421772
+                ],
+                "query": "SELECT count(*) FROM Log WHERE event = 'billing.estorno.esgotado' AND namespace_name = 'homolog' SINCE 7 days ago"
+              }
+            ],
+            "platformOptions": {
+              "ignoreTimeRange": false
+            },
+            "thresholds": []
+          }
+        },
+        {
+          "title": "Latência p95 por serviço",
+          "layout": {
+            "column": 1,
+            "row": 10,
+            "width": 6,
+            "height": 3
+          },
+          "linkedEntityGuids": null,
+          "visualization": {
+            "id": "viz.line"
+          },
+          "rawConfiguration": {
+            "legend": {
+              "enabled": true
+            },
+            "nrqlQueries": [
+              {
+                "accountIds": [
+                  8421772
+                ],
+                "query": "SELECT percentile(duration, 95) FROM Transaction WHERE appName LIKE 'oficina-%-service-homolog' FACET appName TIMESERIES"
+              }
+            ],
+            "platformOptions": {
+              "ignoreTimeRange": false
+            },
+            "yAxisLeft": {
+              "zero": true
+            }
+          }
+        },
+        {
+          "title": "Throughput de mensagens consumidas",
+          "layout": {
+            "column": 7,
+            "row": 10,
+            "width": 6,
+            "height": 3
+          },
+          "linkedEntityGuids": null,
+          "visualization": {
+            "id": "viz.line"
+          },
+          "rawConfiguration": {
+            "legend": {
+              "enabled": true
+            },
+            "nrqlQueries": [
+              {
+                "accountIds": [
+                  8421772
+                ],
+                "query": "SELECT rate(count(*), 1 minute) FROM Transaction WHERE appName LIKE 'oficina-%-service-homolog' AND name LIKE 'OtherTransaction/SQS/mensageria/%' FACET appName TIMESERIES"
+              }
+            ],
+            "platformOptions": {
+              "ignoreTimeRange": false
+            },
+            "yAxisLeft": {
+              "zero": true
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Prod",
+      "description": "Ambiente de produção (namespace prod / appName oficina-*-service-prod).",
+      "widgets": [
+        {
+          "title": "Fluxos iniciados por dia",
+          "layout": {
+            "column": 1,
+            "row": 1,
+            "width": 8,
+            "height": 3
+          },
+          "linkedEntityGuids": null,
+          "visualization": {
+            "id": "viz.line"
+          },
+          "rawConfiguration": {
+            "legend": {
+              "enabled": true
+            },
+            "nrqlQueries": [
+              {
+                "accountIds": [
+                  8421772
+                ],
+                "query": "SELECT uniqueCount(fluxoId) FROM Log WHERE event = 'fluxo.iniciado' AND (entity.name = 'oficina-os-service-prod' OR (namespace_name = 'prod' AND container_name = 'os-service')) SINCE 7 days ago TIMESERIES 1 day"
+              }
+            ],
+            "platformOptions": {
+              "ignoreTimeRange": false
+            },
+            "yAxisLeft": {
+              "zero": true
+            }
+          }
+        },
+        {
+          "title": "Fluxos em falha técnica (24 h)",
+          "layout": {
+            "column": 9,
+            "row": 1,
+            "width": 4,
+            "height": 3
+          },
+          "linkedEntityGuids": null,
+          "visualization": {
+            "id": "viz.billboard"
+          },
+          "rawConfiguration": {
+            "dataFormatters": [],
+            "nrqlQueries": [
+              {
+                "accountIds": [
+                  8421772
+                ],
+                "query": "SELECT uniqueCount(fluxoId) FROM Log WHERE event = 'fluxo.falha_tecnica' AND (entity.name = 'oficina-os-service-prod' OR (namespace_name = 'prod' AND container_name = 'os-service')) SINCE 1 day ago"
+              }
+            ],
+            "platformOptions": {
+              "ignoreTimeRange": false
+            },
+            "thresholds": []
+          }
+        },
+        {
+          "title": "Fluxos por status final",
+          "layout": {
+            "column": 1,
+            "row": 4,
+            "width": 4,
+            "height": 3
+          },
+          "linkedEntityGuids": null,
+          "visualization": {
+            "id": "viz.pie"
+          },
+          "rawConfiguration": {
+            "legend": {
+              "enabled": true
+            },
+            "nrqlQueries": [
+              {
+                "accountIds": [
+                  8421772
+                ],
+                "query": "SELECT uniqueCount(fluxoId) FROM Log WHERE event = 'fluxo.transicao' AND status IN ('CONCLUIDO','COMPENSADO','FALHA_TECNICA') AND (entity.name = 'oficina-os-service-prod' OR (namespace_name = 'prod' AND container_name = 'os-service')) FACET status SINCE 7 days ago"
+              }
+            ],
+            "platformOptions": {
+              "ignoreTimeRange": false
+            }
+          }
+        },
+        {
+          "title": "Compensações por motivo",
+          "layout": {
+            "column": 5,
+            "row": 4,
+            "width": 4,
+            "height": 3
+          },
+          "linkedEntityGuids": null,
+          "visualization": {
+            "id": "viz.bar"
+          },
+          "rawConfiguration": {
+            "legend": {
+              "enabled": true
+            },
+            "nrqlQueries": [
+              {
+                "accountIds": [
+                  8421772
+                ],
+                "query": "SELECT uniqueCount(fluxoId) FROM Log WHERE event = 'fluxo.transicao' AND status = 'COMPENSANDO' AND (entity.name = 'oficina-os-service-prod' OR (namespace_name = 'prod' AND container_name = 'os-service')) FACET motivoCompensacao SINCE 7 days ago"
+              }
+            ],
+            "platformOptions": {
+              "ignoreTimeRange": false
+            }
+          }
+        },
+        {
+          "title": "Tempo médio por etapa (min)",
+          "layout": {
+            "column": 9,
+            "row": 4,
+            "width": 4,
+            "height": 3
+          },
+          "linkedEntityGuids": null,
+          "visualization": {
+            "id": "viz.bar"
+          },
+          "rawConfiguration": {
+            "legend": {
+              "enabled": true
+            },
+            "nrqlQueries": [
+              {
+                "accountIds": [
+                  8421772
+                ],
+                "query": "SELECT average(numeric(duracaoEtapaMs)) / 60000 FROM Log WHERE event = 'fluxo.transicao' AND (entity.name = 'oficina-os-service-prod' OR (namespace_name = 'prod' AND container_name = 'os-service')) FACET etapaAnterior SINCE 7 days ago"
+              }
+            ],
+            "platformOptions": {
+              "ignoreTimeRange": false
+            }
+          }
+        },
+        {
+          "title": "Profundidade das DLQs",
+          "layout": {
+            "column": 1,
+            "row": 7,
+            "width": 6,
+            "height": 3
+          },
+          "linkedEntityGuids": null,
+          "visualization": {
+            "id": "viz.line"
+          },
+          "rawConfiguration": {
+            "legend": {
+              "enabled": true
+            },
+            "nrqlQueries": [
+              {
+                "accountIds": [
+                  8421772
+                ],
+                "query": "SELECT latest(numeric(mensagens)) FROM Log WHERE event = 'mensageria.dlq_profundidade' AND (entity.name = 'oficina-os-service-prod' OR (namespace_name = 'prod' AND container_name = 'os-service')) FACET fila SINCE 6 hours ago TIMESERIES"
+              }
+            ],
+            "platformOptions": {
+              "ignoreTimeRange": false
+            },
+            "yAxisLeft": {
+              "zero": true
+            }
+          }
+        },
+        {
+          "title": "Mensagens fora do contrato (3 serviços)",
+          "layout": {
+            "column": 7,
+            "row": 7,
+            "width": 3,
+            "height": 3
+          },
+          "linkedEntityGuids": null,
+          "visualization": {
+            "id": "viz.billboard"
+          },
+          "rawConfiguration": {
+            "dataFormatters": [],
+            "nrqlQueries": [
+              {
+                "accountIds": [
+                  8421772
+                ],
+                "query": "SELECT uniqueCount(sqsMessageId) FROM Log WHERE event IN ('mensageria.mensagem_invalida', 'mensageria.mensagem.fora-do-contrato') AND namespace_name = 'prod' SINCE 1 day ago"
+              }
+            ],
+            "platformOptions": {
+              "ignoreTimeRange": false
+            },
+            "thresholds": []
+          }
+        },
+        {
+          "title": "Estornos esgotados",
+          "layout": {
+            "column": 10,
+            "row": 7,
+            "width": 3,
+            "height": 3
+          },
+          "linkedEntityGuids": null,
+          "visualization": {
+            "id": "viz.billboard"
+          },
+          "rawConfiguration": {
+            "dataFormatters": [],
+            "nrqlQueries": [
+              {
+                "accountIds": [
+                  8421772
+                ],
+                "query": "SELECT count(*) FROM Log WHERE event = 'billing.estorno.esgotado' AND namespace_name = 'prod' SINCE 7 days ago"
+              }
+            ],
+            "platformOptions": {
+              "ignoreTimeRange": false
+            },
+            "thresholds": []
+          }
+        },
+        {
+          "title": "Latência p95 por serviço",
+          "layout": {
+            "column": 1,
+            "row": 10,
+            "width": 6,
+            "height": 3
+          },
+          "linkedEntityGuids": null,
+          "visualization": {
+            "id": "viz.line"
+          },
+          "rawConfiguration": {
+            "legend": {
+              "enabled": true
+            },
+            "nrqlQueries": [
+              {
+                "accountIds": [
+                  8421772
+                ],
+                "query": "SELECT percentile(duration, 95) FROM Transaction WHERE appName LIKE 'oficina-%-service-prod' FACET appName TIMESERIES"
+              }
+            ],
+            "platformOptions": {
+              "ignoreTimeRange": false
+            },
+            "yAxisLeft": {
+              "zero": true
+            }
+          }
+        },
+        {
+          "title": "Throughput de mensagens consumidas",
+          "layout": {
+            "column": 7,
+            "row": 10,
+            "width": 6,
+            "height": 3
+          },
+          "linkedEntityGuids": null,
+          "visualization": {
+            "id": "viz.line"
+          },
+          "rawConfiguration": {
+            "legend": {
+              "enabled": true
+            },
+            "nrqlQueries": [
+              {
+                "accountIds": [
+                  8421772
+                ],
+                "query": "SELECT rate(count(*), 1 minute) FROM Transaction WHERE appName LIKE 'oficina-%-service-prod' AND name LIKE 'OtherTransaction/SQS/mensageria/%' FACET appName TIMESERIES"
+              }
+            ],
+            "platformOptions": {
+              "ignoreTimeRange": false
+            },
+            "yAxisLeft": {
+              "zero": true
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

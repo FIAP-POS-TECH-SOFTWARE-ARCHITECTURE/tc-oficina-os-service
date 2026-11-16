@@ -2,7 +2,7 @@
 
 Roteiro completo para validar o fluxo de CD (build da imagem → push no ECR → migração do banco → deploy no EKS → smoke test) a partir da sua máquina, antes e depois de disparar o pipeline de verdade.
 
-> **Dependência:** a infraestrutura precisa estar de pé (cluster com nodes `Ready`, secret `oficina-secrets` criado e manifestos aplicados); o provisionamento fica nos repositórios `tc-oficina-infra-k8s` (VPC/EKS/ECR) e `tc-oficina-infra-db` (RDS). Sem isso, só os passos 2 e 3 funcionam.
+> **Dependência:** a infraestrutura precisa estar de pé (cluster com nodes `Ready`, secret `os-service-secrets` criado e manifestos aplicados); o provisionamento fica nos repositórios `tc-oficina-infra-k8s` (VPC/EKS/ECR) e `tc-oficina-infra-db` (RDS). Sem isso, só os passos 2 e 3 funcionam.
 
 ## Pré-requisitos
 
@@ -54,7 +54,7 @@ Reproduz na mão o que o job `docker` faz, com uma tag de teste:
 ```powershell
 $accountId = aws sts get-caller-identity --query Account --output text
 $registry = "$accountId.dkr.ecr.us-east-1.amazonaws.com"
-$image = "$registry/oficina-api:teste-local"
+$image = "$registry/oficina-os-service:teste-local"
 
 aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin $registry
 docker build -t $image .
@@ -64,7 +64,7 @@ docker push $image
 **Esperado:** push concluído; conferir com:
 
 ```powershell
-aws ecr describe-images --repository-name oficina-api --region us-east-1 --query "imageDetails[].imageTags" --output json
+aws ecr describe-images --repository-name oficina-os-service --region us-east-1 --query "imageDetails[].imageTags" --output json
 ```
 
 ## 5. Simular o job deploy (migração + apply + rollout)
@@ -76,10 +76,10 @@ $env = "homolog"   # ou "prod"
 aws eks update-kubeconfig --region us-east-1 --name oficina-eks
 
 # 5.1 Deploy do banco (migração como Job, bloqueante)
-kubectl delete job oficina-db-migrate -n $env --ignore-not-found
-(Get-Content k8s/base/db-migrate-job.yaml -Raw) -replace "PLACEHOLDER_IMAGE", $image | kubectl apply -n $env -f -
-kubectl wait --for=condition=complete job/oficina-db-migrate -n $env --timeout=300s
-kubectl logs job/oficina-db-migrate -n $env
+kubectl delete job os-service-db-migrate -n $env --ignore-not-found
+(Get-Content k8s/base/os-service-db-migrate-job.yaml -Raw) -replace "PLACEHOLDER_IMAGE", $image | kubectl apply -n $env -f -
+kubectl wait --for=condition=complete job/os-service-db-migrate -n $env --timeout=300s
+kubectl logs job/os-service-db-migrate -n $env
 ```
 
 **Esperado:** Job `Complete`; logs mostram `No pending migrations` ou a lista de migrações aplicadas.
@@ -92,15 +92,15 @@ $repo, $tag = $image -split ":", 2
   -replace "ci-placeholder-image", $repo -replace "ci-placeholder-tag", $tag `
   | Set-Content k8s/overlays/$env/kustomization.yaml
 kubectl apply -k k8s/overlays/$env
-kubectl rollout status deployment/oficina-api -n $env --timeout=300s
+kubectl rollout status deployment/os-service -n $env --timeout=300s
 git checkout k8s/overlays/$env/kustomization.yaml   # desfaz a substituição local
 ```
 
-**Esperado:** `deployment "oficina-api" successfully rolled out`.
+**Esperado:** `deployment "os-service" successfully rolled out`.
 
 ```powershell
 # 5.3 Smoke test via LoadBalancer
-$url = kubectl get svc oficina-api -n $env -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
+$url = kubectl get svc os-service -n $env -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
 curl.exe -fsS "http://$url/health"
 ```
 
@@ -124,7 +124,7 @@ O trigger `workflow_dispatch` do `cd.yml` roda a pipeline completa (build → EC
 ```powershell
 .\scripts\aws-academy-refresh.ps1        # sessão do lab ativa + secrets AWS_* renovados
 kubectl get nodes                        # cluster de pé, nodes Ready
-kubectl describe secret oficina-secrets  # chaves com tamanhos reais (DATABASE_URL ~100 bytes, não 9)
+kubectl describe secret os-service-secrets  # chaves com tamanhos reais (DATABASE_URL ~100 bytes, não 9)
 git push origin HEAD                     # branch atualizada no remoto (o dispatch roda o que está LÁ, não o local)
 ```
 
@@ -150,7 +150,7 @@ gh run watch --exit-status
 **Esperado:** `ci.yml` (`quality` + `e2e`) verde no PR; após o merge na `main`, o `cd.yml` roda o job `deploy` (build → push ECR → migração → apply → rollout → smoke). Depois:
 
 ```powershell
-kubectl get deployment oficina-api -o jsonpath='{.spec.template.spec.containers[0].image}'
+kubectl get deployment os-service -o jsonpath='{.spec.template.spec.containers[0].image}'
 ```
 
 **Esperado:** imagem com tag igual ao SHA do commit do merge (`git log -1 origin/main --format=%H`), não `teste-local`. E `curl http://<elb>/health` → 200.
@@ -162,8 +162,8 @@ Com a sessão do lab encerrada, re-rodar o workflow (`gh run rerun <id>`): os jo
 ## 9. Limpeza
 
 ```powershell
-kubectl delete job oficina-db-migrate --ignore-not-found
-aws ecr batch-delete-image --repository-name oficina-api --region us-east-1 --image-ids imageTag=teste-local
+kubectl delete job os-service-db-migrate --ignore-not-found
+aws ecr batch-delete-image --repository-name oficina-os-service --region us-east-1 --image-ids imageTag=teste-local
 ```
 
 Teardown completo da infra: ver os repositórios `tc-oficina-infra-k8s` e `tc-oficina-infra-db`.
@@ -185,9 +185,9 @@ Teardown completo da infra: ver os repositórios `tc-oficina-infra-k8s` e `tc-of
 | ------------------------------------------------- | ------------------------------------------------- | -------------------------------------------------------------------------- |
 | `ExpiredToken` / `UnrecognizedClientException`    | Sessão do lab expirou                             | Runbook do repositório `tc-oficina-infra-k8s`: refresh + `gh run rerun` |
 | `no basic auth credentials` no push               | Login do ECR expirou (12h)                        | Repetir o `docker login` do passo 4                                        |
-| Job de migração em `Error`/`BackoffLimitExceeded` | `DATABASE_URL` errada no secret ou RDS fora do ar | `kubectl logs job/oficina-db-migrate`; conferir secret e RDS               |
-| `kubectl wait` estoura timeout                    | Imagem grande (pull lento) ou migração travada    | `kubectl describe job oficina-db-migrate` e logs do pod                    |
+| Job de migração em `Error`/`BackoffLimitExceeded` | `DATABASE_URL` errada no secret ou RDS fora do ar | `kubectl logs job/os-service-db-migrate`; conferir secret e RDS               |
+| `kubectl wait` estoura timeout                    | Imagem grande (pull lento) ou migração travada    | `kubectl describe job os-service-db-migrate` e logs do pod                    |
 | Smoke test falha com DNS                          | ELB recém-criado ainda propagando                 | Aguardar ~2-3 min e repetir o curl                                         |
 | `docker`/`deploy` skipped num push na main        | Evento não é `push` (ex.: rerun de PR antigo)     | Conferir `github.event_name` no log do run                                 |
 | Rollout trava com `ImagePullBackOff`              | Tag inexistente no ECR ou repo errado             | `aws ecr describe-images`; conferir output `image` do job docker           |
-| Pod `0/1` com erro Prisma `URL must start with postgresql://` | Secret `oficina-secrets` com valores placeholder (sobrescrito ou criado errado) | `kubectl describe secret oficina-secrets` (todas as chaves com 9 bytes = `CHANGE_ME`); recriar o secret (ver repositório `tc-oficina-infra-k8s`) |
+| Pod `0/1` com erro Prisma `URL must start with postgresql://` | Secret `os-service-secrets` com valores placeholder (sobrescrito ou criado errado) | `kubectl describe secret os-service-secrets` (todas as chaves com 9 bytes = `CHANGE_ME`); recriar o secret (ver repositório `tc-oficina-infra-k8s`) |

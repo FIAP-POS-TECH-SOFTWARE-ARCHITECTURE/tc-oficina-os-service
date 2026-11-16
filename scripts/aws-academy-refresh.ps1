@@ -1,12 +1,14 @@
 # Uso:
 #   1. AWS Academy -> Learner Lab -> AWS Details -> AWS CLI: Show -> copiar o bloco [default]
 #   2. .\scripts\aws-academy-refresh.ps1   (cola o bloco, Enter, Ctrl+Z + Enter para finalizar)
-# Atualiza ~/.aws/credentials, a região default e os secrets AWS_* do repositório GitHub (via gh CLI).
+# Atualiza ~/.aws/credentials, a região default e os secrets AWS_* dos 6 repositórios de trabalho (via gh CLI).
 
 $ErrorActionPreference = "Stop"
 
 Write-Host "Cole o bloco [default] do AWS Details (finalize com Ctrl+Z + Enter):"
 $block = [Console]::In.ReadToEnd()
+# Remove o Ctrl+Z (0x1A) que o console grava quando ele é digitado no fim da última linha
+$block = $block -replace "\x1A", ""
 
 if ($block -notmatch "aws_access_key_id\s*=\s*(\S+)") { throw "aws_access_key_id não encontrado no bloco colado" }
 $accessKey = $Matches[1]
@@ -14,6 +16,23 @@ if ($block -notmatch "aws_secret_access_key\s*=\s*(\S+)") { throw "aws_secret_ac
 $secretKey = $Matches[1]
 if ($block -notmatch "aws_session_token\s*=\s*(\S+)") { throw "aws_session_token não encontrado" }
 $sessionToken = $Matches[1]
+
+# Repositórios de trabalho que recebem os secrets AWS_*
+$org = "FIAP-POS-TECH-SOFTWARE-ARCHITECTURE"
+$repos = @(
+    "tc-oficina-os-service",
+    "tc-oficina-billing-service",
+    "tc-oficina-execution-service",
+    "tc-oficina-lambda-auth",
+    "tc-oficina-infra-k8s",
+    "tc-oficina-infra-db"
+) | ForEach-Object { "$org/$_" }
+
+# Valida todos antes de gravar qualquer secret (evita rotação parcial)
+foreach ($repo in $repos) {
+    gh repo view $repo --json name *> $null
+    if ($LASTEXITCODE -ne 0) { throw "Repositório não encontrado ou sem acesso: $repo" }
+}
 
 # 1) ~/.aws/credentials
 $awsDir = Join-Path $HOME ".aws"
@@ -30,14 +49,7 @@ Write-Host "~/.aws/credentials atualizado."
 aws configure set region us-east-1
 Write-Host "Região default configurada (us-east-1)."
 
-# 2) GitHub Secrets nos 4 repositórios da Fase 3
-$repos = @(
-    "FIAP-POS-TECH-SOFTWARE-ARCHITECTURE/tc-oficina-app",
-    "FIAP-POS-TECH-SOFTWARE-ARCHITECTURE/tc-oficina-lambda-auth",
-    "FIAP-POS-TECH-SOFTWARE-ARCHITECTURE/tc-oficina-infra-k8s",
-    "FIAP-POS-TECH-SOFTWARE-ARCHITECTURE/tc-oficina-infra-db"
-)
-
+# 2) GitHub Secrets nos repositórios de trabalho
 foreach ($repo in $repos) {
     gh secret set AWS_ACCESS_KEY_ID --repo $repo --body $accessKey
     gh secret set AWS_SECRET_ACCESS_KEY --repo $repo --body $secretKey
@@ -46,4 +58,5 @@ foreach ($repo in $repos) {
 }
 
 aws sts get-caller-identity
+if ($LASTEXITCODE -ne 0) { throw "sts get-caller-identity falhou: confira o bloco colado" }
 Write-Host "Credenciais válidas. Pronto."

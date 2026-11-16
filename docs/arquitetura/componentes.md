@@ -1,5 +1,8 @@
 # Diagrama de Componentes
 
+> **Visão da Fase 3.** A arquitetura atual, com os três microsserviços, está em
+> [visao-geral-microsservicos.md](visao-geral-microsservicos.md).
+
 Visão de nuvem completa da solução da Fase 3: entrada pelo API Gateway, autenticação
 serverless, aplicação no EKS, banco gerenciado, contratos via SSM, observabilidade e
 pipelines de CI/CD.
@@ -7,8 +10,8 @@ pipelines de CI/CD.
 ```mermaid
 graph TB
     subgraph Clientes
-        CLI[Cliente da oficina<br/>app/portal]
-        STAFF[Equipe interna<br/>atendente/mecanico/estoquista/admin]
+        CLI["Cliente da oficina<br/>app/portal"]
+        STAFF["Equipe interna<br/>atendente/mecanico/estoquista/admin"]
     end
 
     subgraph AWS["AWS us-east-1"]

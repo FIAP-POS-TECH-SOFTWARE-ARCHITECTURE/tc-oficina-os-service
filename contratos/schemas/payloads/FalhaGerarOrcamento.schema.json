@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://oficina.local/contratos/schemas/payloads/FalhaGerarOrcamento.schema.json",
+  "title": "FalhaGerarOrcamento",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "motivo"
+  ],
+  "properties": {
+    "motivo": {
+      "$ref": "https://oficina.local/contratos/schemas/envelope.schema.json#/$defs/texto"
+    }
+  }
+}

@@ -10,7 +10,7 @@ describe("ordenacao-listagem", () => {
 		);
 	});
 
-	it("ordem completa: EM_EXECUCAO > AGUARDANDO_APROVACAO > EM_DIAGNOSTICO > RECEBIDA > BLOQUEADA > CANCELADA", () => {
+	it("ordem completa: EM_EXECUCAO > AGUARDANDO_PAGAMENTO > AGUARDANDO_APROVACAO > EM_DIAGNOSTICO > RECEBIDA > BLOQUEADA > CANCELADA", () => {
 		const lista = [
 			os(OsStatus.CANCELADA, "2026-01-01"),
 			os(OsStatus.RECEBIDA, "2026-01-01"),
@@ -18,9 +18,11 @@ describe("ordenacao-listagem", () => {
 			os(OsStatus.BLOQUEADA, "2026-01-01"),
 			os(OsStatus.EM_DIAGNOSTICO, "2026-01-01"),
 			os(OsStatus.AGUARDANDO_APROVACAO, "2026-01-01"),
+			os(OsStatus.AGUARDANDO_PAGAMENTO, "2026-01-01"),
 		].sort(compararParaListagem);
 		expect(lista.map((o) => o.status)).toEqual([
 			OsStatus.EM_EXECUCAO,
+			OsStatus.AGUARDANDO_PAGAMENTO,
 			OsStatus.AGUARDANDO_APROVACAO,
 			OsStatus.EM_DIAGNOSTICO,
 			OsStatus.RECEBIDA,

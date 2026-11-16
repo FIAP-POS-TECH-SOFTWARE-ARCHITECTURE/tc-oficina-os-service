@@ -3,6 +3,10 @@
 - **Status:** Aceita
 - **Data:** 2026-09-10
 
+> **Atualização na Fase 4:** o gateway passou a rotear `/billing/*` e `/execucao/*` para os
+> novos serviços; o alvo de cada proxy vem de `/oficina/<env>/<servico>-lb-hostname`
+> (`os-service`, `billing-service`, `execution-service`), não mais de `app-lb-hostname`.
+
 ## Contexto
 
 O API Gateway precisa: (1) expor `POST /auth/token` para a Lambda de emissão de token;

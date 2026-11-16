@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://oficina.local/contratos/schemas/payloads/ExecucaoCancelada.schema.json",
+  "title": "ExecucaoCancelada",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "etapa",
+    "motivo"
+  ],
+  "properties": {
+    "etapa": {
+      "enum": [
+        "DIAGNOSTICO",
+        "REPARO",
+        null
+      ]
+    },
+    "motivo": {
+      "$ref": "https://oficina.local/contratos/schemas/envelope.schema.json#/$defs/texto"
+    }
+  }
+}

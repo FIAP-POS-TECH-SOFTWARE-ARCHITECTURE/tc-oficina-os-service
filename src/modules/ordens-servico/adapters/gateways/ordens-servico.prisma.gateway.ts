@@ -1,9 +1,12 @@
-import { Injectable, Logger } from "@nestjs/common";
-import { OsItemServicoStatus, OsStatus as PrismaOsStatus, Prisma, TipoMovimentoEstoque } from "@prisma/client";
+import { Inject, Injectable, Logger } from "@nestjs/common";
+import { OsStatus as PrismaOsStatus, Prisma } from "@prisma/client";
 import { PrismaService } from "../../../../prisma/prisma.service";
+import { RESERVA_ESTOQUE_OS, type ReservaEstoqueOsPort } from "../../../insumos/application/ports/reserva-estoque-os.gateway";
+import { canTransition } from "../../domain/fluxo-estados-os";
 import { OsStatus } from "../../domain/os-status";
-import { OrdensServicoGatewayPort, ResultadoAprovacao, TransicaoPersistencia } from "../../application/ports/ordens-servico.gateway";
+import { OrdensServicoGatewayPort, TransicaoPersistencia } from "../../application/ports/ordens-servico.gateway";
 import { HistoricoItemApp, OsChaveOrdenacao, OsDetalhe, OsResumo, TempoMedioServicoApp } from "../../application/ports/os-types";
+import { registrarTransicaoOs } from "./historico-os.prisma";
 
 const OS_INCLUDE = {
 	cliente: true,
@@ -13,21 +16,14 @@ const OS_INCLUDE = {
 	historico: { orderBy: { createdAt: "asc" } as const },
 } satisfies Prisma.OrdemServicoInclude;
 
-interface ReservaEstoque {
-	insumoId: string;
-	codigo: string;
-	nome: string;
-	quantidade: number;
-	anterior: number;
-	posterior: number;
-	estoqueMinimo: number;
-}
-
 @Injectable()
 export class OrdensServicoPrismaGateway implements OrdensServicoGatewayPort {
 	private readonly logger = new Logger(OrdensServicoPrismaGateway.name);
 
-	constructor(private readonly prisma: PrismaService) {}
+	constructor(
+		private readonly prisma: PrismaService,
+		@Inject(RESERVA_ESTOQUE_OS) private readonly reservaEstoque: ReservaEstoqueOsPort,
+	) {}
 
 	async criarComHistorico(dados: { numero: string; clienteId: string; veiculoId: string }): Promise<{ id: string }> {
 		return this.prisma.$transaction(async (tx) => {
@@ -133,13 +129,6 @@ export class OrdensServicoPrismaGateway implements OrdensServicoGatewayPort {
 		`;
 	}
 
-	async atualizarDiagnostico(id: string, diagnostico: string): Promise<void> {
-		await this.prisma.ordemServico.update({
-			where: { id },
-			data: { diagnostico },
-		});
-	}
-
 	async transicionarComHistorico(t: TransicaoPersistencia): Promise<void> {
 		const extras = (t.dadosExtras ?? {}) as Prisma.OrdemServicoUpdateInput;
 		await this.prisma.$transaction(async (tx) => {
@@ -147,7 +136,7 @@ export class OrdensServicoPrismaGateway implements OrdensServicoGatewayPort {
 				where: { id: t.id },
 				data: { ...extras, status: t.statusNovo },
 			});
-			await this.registrarTransicao(tx, {
+			await registrarTransicaoOs(tx, this.logger, {
 				ordemServicoId: t.id,
 				statusAnterior: t.statusAnterior,
 				statusNovo: t.statusNovo,
@@ -157,346 +146,26 @@ export class OrdensServicoPrismaGateway implements OrdensServicoGatewayPort {
 		});
 	}
 
-	/**
-	 * Grava a linha de histórico de uma transição de status e emite o evento
-	 * de negócio `os.status.changed` consumido pelos dashboards.
-	 *
-	 * `durationMs` = tempo (ms) que a OS passou no status anterior, medido a
-	 * partir do `createdAt` da linha de histórico imediatamente anterior. Quando
-	 * não existe linha anterior (primeira transição após a criação), assume 0.
-	 */
-	private async registrarTransicao(
-		tx: Prisma.TransactionClient,
-		args: {
-			ordemServicoId: string;
-			numero?: string;
-			statusAnterior: PrismaOsStatus | OsStatus | null;
-			statusNovo: PrismaOsStatus | OsStatus;
-			usuarioId?: string;
-			observacao?: string;
-		},
-	): Promise<void> {
-		const anterior = await tx.osHistoricoStatus.findFirst({
-			where: { ordemServicoId: args.ordemServicoId },
-			orderBy: { createdAt: "desc" },
-			select: { createdAt: true },
-		});
-		const durationMs = anterior ? Date.now() - anterior.createdAt.getTime() : 0;
-
-		let numero = args.numero;
-		if (!numero) {
-			const os = await tx.ordemServico.findUnique({
-				where: { id: args.ordemServicoId },
-				select: { numero: true },
-			});
-			numero = os?.numero ?? undefined;
-		}
-
-		await tx.osHistoricoStatus.create({
-			data: {
-				ordemServicoId: args.ordemServicoId,
-				statusAnterior: args.statusAnterior,
-				statusNovo: args.statusNovo,
-				usuarioId: args.usuarioId ?? undefined,
-				observacao: args.observacao ?? undefined,
-			},
-		});
-
-		// Emitido dentro da transação: em 4 dos 5 chamadores é a última instrução
-		// antes do commit, então a janela pra um rollback posterior é mínima. O
-		// trade-off aceito é um evento eventualmente órfão em caso de rollback,
-		// preferível a perder o evento se o log falhasse fora da transação.
-		this.logger.log(
-			{
-				event: "os.status.changed",
-				osId: args.ordemServicoId,
-				numero,
-				fromStatus: args.statusAnterior,
-				toStatus: args.statusNovo,
-				durationMs,
-			},
-			OrdensServicoPrismaGateway.name,
-		);
-	}
-
-	calcularTotal(os: OsDetalhe): unknown {
-		const zero = new Prisma.Decimal(0);
-		const totalServicos = os.itensServico.reduce((acc, i) => acc.add(i.subtotal as Prisma.Decimal), zero);
-		const totalInsumos = os.itensInsumo.reduce((acc, i) => acc.add(i.subtotal as Prisma.Decimal), zero);
-		return totalServicos.add(totalInsumos);
-	}
-
-	async criarItemServico(dados: {
-		ordemServicoId: string;
-		servicoId: string;
-		precoUnitario: unknown;
-		quantidade: number;
-	}): Promise<void> {
-		const precoUnitario = dados.precoUnitario as Prisma.Decimal;
-		const subtotal = new Prisma.Decimal(precoUnitario).mul(dados.quantidade);
-		await this.prisma.osItemServico.create({
-			data: {
-				ordemServicoId: dados.ordemServicoId,
-				servicoId: dados.servicoId,
-				status: OsItemServicoStatus.PENDENTE,
-				precoUnitario,
-				quantidade: dados.quantidade,
-				subtotal,
-			},
-		});
-	}
-
-	buscarItemServico(
-		itemId: string,
-	): Promise<{ id: string; ordemServicoId: string; status: string; iniciadoExecucaoEm: Date | null } | null> {
-		return this.prisma.osItemServico.findUnique({ where: { id: itemId } });
-	}
-
-	async removerItemServico(itemId: string): Promise<void> {
-		await this.prisma.osItemServico.delete({ where: { id: itemId } });
-	}
-
-	async iniciarItemServico(params: { osId: string; itemId: string; agora: Date; marcarInicioOs: boolean }): Promise<void> {
-		await this.prisma.$transaction(async (tx) => {
-			await tx.osItemServico.update({
-				where: { id: params.itemId },
-				data: { status: OsItemServicoStatus.EM_EXECUCAO, iniciadoExecucaoEm: params.agora },
-			});
-			if (params.marcarInicioOs) {
-				await tx.ordemServico.update({
-					where: { id: params.osId },
-					data: { iniciadoExecucaoEm: params.agora },
-				});
-			}
-		});
-	}
-
-	async concluirItemServico(params: { itemId: string; iniciadoExecucaoEm: Date; finalizadoExecucaoEm: Date }): Promise<void> {
-		await this.prisma.osItemServico.update({
-			where: { id: params.itemId },
-			data: {
-				status: OsItemServicoStatus.CONCLUIDO,
-				iniciadoExecucaoEm: params.iniciadoExecucaoEm,
-				finalizadoExecucaoEm: params.finalizadoExecucaoEm,
-			},
-		});
-	}
-
-	async cancelarItemServico(itemId: string): Promise<void> {
-		await this.prisma.osItemServico.update({
-			where: { id: itemId },
-			data: { status: OsItemServicoStatus.CANCELADO },
-		});
-	}
-
-	async criarItemInsumo(dados: {
-		ordemServicoId: string;
-		insumoId: string;
-		precoUnitario: unknown;
-		quantidade: number;
-	}): Promise<void> {
-		const precoUnitario = dados.precoUnitario as Prisma.Decimal;
-		const subtotal = new Prisma.Decimal(precoUnitario).mul(dados.quantidade);
-		await this.prisma.osItemInsumo.create({
-			data: {
-				ordemServicoId: dados.ordemServicoId,
-				insumoId: dados.insumoId,
-				precoUnitario,
-				quantidade: dados.quantidade,
-				subtotal,
-			},
-		});
-	}
-
-	buscarItemInsumo(itemId: string): Promise<{ id: string; ordemServicoId: string } | null> {
-		return this.prisma.osItemInsumo.findUnique({ where: { id: itemId } });
-	}
-
-	async removerItemInsumo(itemId: string): Promise<void> {
-		await this.prisma.osItemInsumo.delete({ where: { id: itemId } });
-	}
-
-	async executarAprovacao(os: OsDetalhe, observacao: string | null | undefined, agora: Date): Promise<ResultadoAprovacao> {
-		let bloqueadaPorFaltaEstoque = false;
-		let faltantes: string[] = [];
-		await this.prisma.$transaction(async (tx) => {
-			const planoBaixa = await this.montarPlanoBaixaEstoque(tx, os.itensInsumo);
-			if (planoBaixa.faltantes.length > 0) {
-				bloqueadaPorFaltaEstoque = true;
-				faltantes = planoBaixa.faltantes;
-				await tx.ordemServico.update({
-					where: { id: os.id },
-					data: {
-						status: PrismaOsStatus.BLOQUEADA,
-						aprovadoEm: agora,
-					},
-				});
-				await this.registrarTransicao(tx, {
-					ordemServicoId: os.id,
-					numero: os.numero,
-					statusAnterior: os.status,
-					statusNovo: PrismaOsStatus.BLOQUEADA,
-					observacao: observacao ?? `Orçamento aprovado, OS bloqueada por falta de estoque: ${planoBaixa.faltantes.join("; ")}`,
-				});
-				return;
-			}
-			await this.aplicarBaixaEstoque(tx, os.id, planoBaixa.reservas, "Saída por aprovação de OS (cliente)", null);
-			await tx.ordemServico.update({
-				where: { id: os.id },
-				data: {
-					status: PrismaOsStatus.EM_EXECUCAO,
-					aprovadoEm: agora,
-					iniciadoExecucaoEm: agora,
-				},
-			});
-			await this.registrarTransicao(tx, {
-				ordemServicoId: os.id,
-				numero: os.numero,
-				statusAnterior: os.status,
-				statusNovo: PrismaOsStatus.EM_EXECUCAO,
-				observacao: observacao ?? "Orçamento aprovado pelo cliente",
-			});
-		});
-		return { bloqueadaPorFaltaEstoque, faltantes };
-	}
-
-	async executarDesbloqueio(
-		os: OsDetalhe,
-		usuarioId: string,
-		observacao: string | null | undefined,
-		agora: Date,
-	): Promise<{ faltantes: string[] }> {
+	// Relê o status com a linha travada: o caso de uso validou sobre uma leitura anterior, e um
+	// cancelamento ou finalização concorrente pode ter mudado a OS nesse meio-tempo.
+	async executarCancelamento(os: OsDetalhe, usuarioId: string | null, motivo: string | null | undefined): Promise<boolean> {
 		return this.prisma.$transaction(async (tx) => {
-			const planoBaixa = await this.montarPlanoBaixaEstoque(tx, os.itensInsumo);
-			if (planoBaixa.faltantes.length > 0) return { faltantes: planoBaixa.faltantes };
-			await this.aplicarBaixaEstoque(tx, os.id, planoBaixa.reservas, "Saída por desbloqueio de OS", usuarioId);
-			await tx.ordemServico.update({
-				where: { id: os.id },
-				data: {
-					status: PrismaOsStatus.EM_EXECUCAO,
-					iniciadoExecucaoEm: os.iniciadoExecucaoEm ?? agora,
-				},
-			});
-			await this.registrarTransicao(tx, {
-				ordemServicoId: os.id,
-				numero: os.numero,
-				statusAnterior: os.status,
-				statusNovo: PrismaOsStatus.EM_EXECUCAO,
-				observacao: observacao ?? "OS desbloqueada após validação de estoque",
-				usuarioId,
-			});
-			return { faltantes: [] as string[] };
-		});
-	}
+			const [atual] = await tx.$queryRaw<
+				{ status: PrismaOsStatus }[]
+			>`SELECT status FROM ordens_servico WHERE id = ${os.id}::uuid FOR UPDATE`;
+			if (!atual || !canTransition(atual.status as unknown as OsStatus, "cancelar")) return false;
 
-	async executarCancelamento(
-		os: OsDetalhe,
-		usuarioId: string | null,
-		motivo: string | null | undefined,
-		estornarEstoque: boolean,
-	): Promise<void> {
-		await this.prisma.$transaction(async (tx) => {
-			if (estornarEstoque) {
-				for (const item of os.itensInsumo) {
-					const insumo = await tx.insumo.findUnique({ where: { id: item.insumoId } });
-					if (!insumo) continue;
-					const posterior = insumo.quantidadeEstoque + item.quantidade;
-					await tx.insumo.update({
-						where: { id: insumo.id },
-						data: { quantidadeEstoque: posterior },
-					});
-					await tx.movimentoEstoque.create({
-						data: {
-							insumoId: insumo.id,
-							tipo: TipoMovimentoEstoque.ESTORNO,
-							quantidade: item.quantidade,
-							quantidadeAnterior: insumo.quantidadeEstoque,
-							quantidadePosterior: posterior,
-							ordemServicoId: os.id,
-							motivo: "Estorno por cancelamento de OS",
-							usuarioId,
-						},
-					});
-				}
-			}
-			await tx.ordemServico.update({
-				where: { id: os.id },
-				data: { status: PrismaOsStatus.CANCELADA, canceladoEm: new Date() },
-			});
-			await this.registrarTransicao(tx, {
+			await this.reservaEstoque.estornar({ ordemServicoId: os.id, motivo: "Estorno por cancelamento de OS", usuarioId }, tx);
+			await tx.ordemServico.update({ where: { id: os.id }, data: { status: PrismaOsStatus.CANCELADA, canceladoEm: new Date() } });
+			await registrarTransicaoOs(tx, this.logger, {
 				ordemServicoId: os.id,
 				numero: os.numero,
-				statusAnterior: os.status,
+				statusAnterior: atual.status,
 				statusNovo: PrismaOsStatus.CANCELADA,
 				observacao: motivo ?? "OS cancelada",
 				usuarioId: usuarioId ?? undefined,
 			});
+			return true;
 		});
-	}
-
-	private async montarPlanoBaixaEstoque(
-		tx: Prisma.TransactionClient,
-		itens: { insumoId: string; quantidade: number }[],
-	): Promise<{ faltantes: string[]; reservas: ReservaEstoque[] }> {
-		const faltantes: string[] = [];
-		const reservas: ReservaEstoque[] = [];
-
-		for (const item of itens) {
-			const insumo = await tx.insumo.findUnique({ where: { id: item.insumoId } });
-			if (!insumo) {
-				faltantes.push(`Insumo ${item.insumoId} não encontrado`);
-				continue;
-			}
-
-			const posterior = insumo.quantidadeEstoque - item.quantidade;
-			if (posterior < 0) {
-				faltantes.push(`${insumo.nome} (${insumo.quantidadeEstoque} disponíveis, ${item.quantidade} requisitados)`);
-				continue;
-			}
-
-			reservas.push({
-				insumoId: insumo.id,
-				codigo: insumo.codigo,
-				nome: insumo.nome,
-				quantidade: item.quantidade,
-				anterior: insumo.quantidadeEstoque,
-				posterior,
-				estoqueMinimo: insumo.estoqueMinimo,
-			});
-		}
-
-		return { faltantes, reservas };
-	}
-
-	private async aplicarBaixaEstoque(
-		tx: Prisma.TransactionClient,
-		ordemServicoId: string,
-		reservas: ReservaEstoque[],
-		motivo: string,
-		usuarioId: string | null,
-	): Promise<void> {
-		for (const reserva of reservas) {
-			await tx.insumo.update({
-				where: { id: reserva.insumoId },
-				data: { quantidadeEstoque: reserva.posterior },
-			});
-
-			await tx.movimentoEstoque.create({
-				data: {
-					insumoId: reserva.insumoId,
-					tipo: TipoMovimentoEstoque.SAIDA,
-					quantidade: reserva.quantidade,
-					quantidadeAnterior: reserva.anterior,
-					quantidadePosterior: reserva.posterior,
-					ordemServicoId,
-					motivo,
-					usuarioId,
-				},
-			});
-
-			if (reserva.posterior < reserva.estoqueMinimo) {
-				this.logger.warn(`Insumo ${reserva.codigo} ficou abaixo do estoque mínimo (${reserva.posterior}/${reserva.estoqueMinimo})`);
-			}
-		}
 	}
 }

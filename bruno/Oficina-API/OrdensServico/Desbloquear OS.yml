@@ -1,7 +1,7 @@
 info:
   name: Desbloquear OS
   type: http
-  seq: 10
+  seq: 23
 
 http:
   method: POST
@@ -10,7 +10,7 @@ http:
     type: json
     data: |-
       {
-          "observacao": "Estoque reposto, OS liberada para execução"
+          "observacao": "Estoque reposto"
         }
   auth: inherit
 

@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { AppController } from "./app.controller";
 import { AppService } from "./app.service";
 import { ConfigModule } from "@nestjs/config";
+import { ScheduleModule } from "@nestjs/schedule";
 import { PrismaModule } from "./prisma/prisma.module";
 import { ModulesModule } from "./modules/modules.module";
 import { HealthModule } from "./modules/health/health.module";
@@ -12,6 +13,7 @@ import { randomUUID } from "node:crypto";
 @Module({
 	imports: [
 		ConfigModule.forRoot(),
+		ScheduleModule.forRoot(),
 		LoggerModule.forRoot({
 			pinoHttp: {
 				genReqId: (req) => {

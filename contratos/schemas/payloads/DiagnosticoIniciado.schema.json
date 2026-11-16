@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://oficina.local/contratos/schemas/payloads/DiagnosticoIniciado.schema.json",
+  "title": "DiagnosticoIniciado",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "mecanicoId"
+  ],
+  "properties": {
+    "mecanicoId": {
+      "$ref": "https://oficina.local/contratos/schemas/envelope.schema.json#/$defs/uuid"
+    }
+  }
+}

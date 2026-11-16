@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://oficina.local/contratos/schemas/payloads/IniciarReparo.schema.json",
+  "title": "IniciarReparo",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "itensServico",
+    "itensInsumo"
+  ],
+  "properties": {
+    "itensServico": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "itemId",
+          "servicoId",
+          "nome",
+          "quantidade",
+          "tempoEstimadoMin"
+        ],
+        "properties": {
+          "itemId": {
+            "$ref": "https://oficina.local/contratos/schemas/envelope.schema.json#/$defs/uuid"
+          },
+          "servicoId": {
+            "$ref": "https://oficina.local/contratos/schemas/envelope.schema.json#/$defs/uuid"
+          },
+          "nome": {
+            "type": "string",
+            "minLength": 1
+          },
+          "quantidade": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "tempoEstimadoMin": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "itensInsumo": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "insumoId",
+          "nome",
+          "quantidade"
+        ],
+        "properties": {
+          "insumoId": {
+            "$ref": "https://oficina.local/contratos/schemas/envelope.schema.json#/$defs/uuid"
+          },
+          "nome": {
+            "type": "string",
+            "minLength": 1
+          },
+          "quantidade": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      }
+    }
+  }
+}

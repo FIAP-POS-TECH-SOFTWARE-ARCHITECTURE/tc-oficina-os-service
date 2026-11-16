@@ -1,5 +1,5 @@
 import { Logger } from "@nestjs/common";
-import { OsStatus as PrismaOsStatus, TipoMovimentoEstoque } from "@prisma/client";
+import { OsStatus as PrismaOsStatus } from "@prisma/client";
 import { OsStatus } from "../../domain/os-status";
 import { OsDetalhe } from "../../application/ports/os-types";
 import { OrdensServicoPrismaGateway } from "./ordens-servico.prisma.gateway";
@@ -8,9 +8,7 @@ function baseTx() {
 	return {
 		ordemServico: { create: jest.fn(), update: jest.fn(), findUnique: jest.fn().mockResolvedValue({ numero: "OS-2026-000001" }) },
 		osHistoricoStatus: { create: jest.fn(), findFirst: jest.fn().mockResolvedValue(null) },
-		osItemServico: { update: jest.fn() },
-		insumo: { findUnique: jest.fn(), update: jest.fn() },
-		movimentoEstoque: { create: jest.fn() },
+		$queryRaw: jest.fn().mockResolvedValue([{ status: PrismaOsStatus.RECEBIDA }]),
 	};
 }
 
@@ -18,8 +16,10 @@ describe("OrdensServicoPrismaGateway", () => {
 	let prisma: any;
 	let gateway: OrdensServicoPrismaGateway;
 	let logSpy: jest.SpyInstance;
+	const reserva = { reservar: jest.fn(), estornar: jest.fn().mockResolvedValue({ insumosEstornados: 0 }) };
 
 	beforeEach(() => {
+		jest.clearAllMocks();
 		logSpy = jest.spyOn(Logger.prototype, "log").mockImplementation(() => undefined);
 		prisma = {
 			ordemServico: {
@@ -30,12 +30,10 @@ describe("OrdensServicoPrismaGateway", () => {
 				update: jest.fn(),
 			},
 			osHistoricoStatus: { findMany: jest.fn(), create: jest.fn() },
-			osItemServico: { create: jest.fn(), findUnique: jest.fn(), delete: jest.fn(), update: jest.fn() },
-			osItemInsumo: { create: jest.fn(), findUnique: jest.fn(), delete: jest.fn() },
 			$transaction: jest.fn(),
 			$queryRaw: jest.fn(),
 		};
-		gateway = new OrdensServicoPrismaGateway(prisma);
+		gateway = new OrdensServicoPrismaGateway(prisma, reserva);
 	});
 
 	afterEach(() => {
@@ -105,6 +103,59 @@ describe("OrdensServicoPrismaGateway", () => {
 	it("buscarDetalhesPorIds com lista vazia não consulta o banco", async () => {
 		await expect(gateway.buscarDetalhesPorIds([])).resolves.toEqual([]);
 		expect(prisma.ordemServico.findMany).not.toHaveBeenCalled();
+	});
+
+	it.each([
+		["ativos", "s.ativo = true"],
+		["inativos", "s.ativo = false"],
+	] as const)("tempoMedioPorServico(%s) filtra", async (filtro, trecho) => {
+		prisma.$queryRaw.mockResolvedValueOnce([]);
+		await gateway.tempoMedioPorServico(filtro);
+		expect(JSON.stringify(prisma.$queryRaw.mock.calls[0])).toContain(trecho);
+	});
+
+	it("tempoMedioPorServico(ambos) não filtra por ativo", async () => {
+		prisma.$queryRaw.mockResolvedValueOnce([]);
+		await gateway.tempoMedioPorServico("ambos");
+		expect(JSON.stringify(prisma.$queryRaw.mock.calls[0])).not.toContain("s.ativo =");
+	});
+
+	it("listarParaOrdenacao sem filtros não restringe nada", async () => {
+		prisma.ordemServico.findMany.mockResolvedValueOnce([]);
+		await gateway.listarParaOrdenacao({});
+		expect(prisma.ordemServico.findMany).toHaveBeenCalledWith({ where: {}, select: { id: true, status: true, createdAt: true } });
+	});
+
+	it("buscarPorId busca a OS sem relações", async () => {
+		prisma.ordemServico.findUnique.mockResolvedValueOnce(null);
+		await expect(gateway.buscarPorId("os1")).resolves.toBeNull();
+		expect(prisma.ordemServico.findUnique).toHaveBeenCalledWith({ where: { id: "os1" } });
+	});
+
+	it("buscarPorNumero busca pelo número com include completo", async () => {
+		prisma.ordemServico.findUnique.mockResolvedValueOnce({ id: "os1" });
+		await gateway.buscarPorNumero("OS-2026-000001");
+		expect(prisma.ordemServico.findUnique).toHaveBeenCalledWith(
+			expect.objectContaining({ where: { numero: "OS-2026-000001" }, include: expect.any(Object) }),
+		);
+	});
+
+	it("listarHistorico ordena do mais antigo ao mais novo com o usuário", async () => {
+		prisma.osHistoricoStatus.findMany.mockResolvedValueOnce([]);
+		await gateway.listarHistorico("os1");
+		expect(prisma.osHistoricoStatus.findMany).toHaveBeenCalledWith({
+			where: { ordemServicoId: "os1" },
+			include: { usuario: true },
+			orderBy: { createdAt: "asc" },
+		});
+	});
+
+	it("contarPorAno conta só as OS criadas dentro do ano", async () => {
+		prisma.ordemServico.count.mockResolvedValueOnce(7);
+		await expect(gateway.contarPorAno(2026)).resolves.toBe(7);
+		expect(prisma.ordemServico.count).toHaveBeenCalledWith({
+			where: { createdAt: { gte: new Date("2026-01-01T00:00:00Z"), lt: new Date("2027-01-01T00:00:00Z") } },
+		});
 	});
 
 	it("listarParaOrdenacao aplica notIn quando recebe excluirStatus", async () => {
@@ -187,7 +238,7 @@ describe("OrdensServicoPrismaGateway", () => {
 		const tx = baseTx();
 		prisma.$transaction.mockImplementationOnce(async (fn: any) => fn(tx));
 
-		await gateway.executarCancelamento(osDetalhe({ status: OsStatus.BLOQUEADA }), "u1", null, false);
+		await gateway.executarCancelamento(osDetalhe({ status: OsStatus.BLOQUEADA }), "u1", null);
 
 		expect(logSpy).toHaveBeenCalledWith(
 			expect.objectContaining({
@@ -200,135 +251,51 @@ describe("OrdensServicoPrismaGateway", () => {
 		);
 	});
 
-	it("executarAprovacao com estoque suficiente baixa estoque e vai a EM_EXECUCAO", async () => {
+	it("executarCancelamento estorna pela porta de estoque na MESMA transação e cancela", async () => {
 		const tx = baseTx();
-		tx.insumo.findUnique.mockResolvedValueOnce({
-			id: "i1",
-			nome: "Filtro",
-			codigo: "P-001",
-			quantidadeEstoque: 10,
-			estoqueMinimo: 1,
-		});
 		prisma.$transaction.mockImplementationOnce(async (fn: any) => fn(tx));
 
-		const agora = new Date();
-		const resultado = await gateway.executarAprovacao(osDetalhe(), null, agora);
+		await gateway.executarCancelamento(osDetalhe({ status: OsStatus.AGUARDANDO_PAGAMENTO }), "u1", "cliente desistiu");
 
-		expect(resultado).toEqual({ bloqueadaPorFaltaEstoque: false, faltantes: [] });
-		expect(tx.insumo.update).toHaveBeenCalledWith({
-			where: { id: "i1" },
-			data: { quantidadeEstoque: 8 },
-		});
-		expect(tx.movimentoEstoque.create).toHaveBeenCalledWith({
-			data: expect.objectContaining({
-				tipo: TipoMovimentoEstoque.SAIDA,
-				quantidade: 2,
-				quantidadeAnterior: 10,
-				quantidadePosterior: 8,
-			}),
-		});
+		expect(reserva.estornar).toHaveBeenCalledWith(
+			{ ordemServicoId: "os1", motivo: "Estorno por cancelamento de OS", usuarioId: "u1" },
+			tx,
+		);
 		expect(tx.ordemServico.update).toHaveBeenCalledWith({
 			where: { id: "os1" },
-			data: expect.objectContaining({ status: PrismaOsStatus.EM_EXECUCAO, aprovadoEm: agora, iniciadoExecucaoEm: agora }),
+			data: { status: PrismaOsStatus.CANCELADA, canceladoEm: expect.any(Date) },
+		});
+		expect(tx.osHistoricoStatus.create).toHaveBeenCalledWith({
+			data: expect.objectContaining({ statusNovo: PrismaOsStatus.CANCELADA, observacao: "cliente desistiu", usuarioId: "u1" }),
 		});
 	});
 
-	it("executarAprovacao sem estoque bloqueia sem baixar", async () => {
+	it("executarCancelamento relê o status sob lock: OS que virou FINALIZADA não é cancelada nem estornada", async () => {
 		const tx = baseTx();
-		tx.insumo.findUnique.mockResolvedValueOnce({
-			id: "i1",
-			nome: "Filtro",
-			codigo: "P-001",
-			quantidadeEstoque: 1,
-			estoqueMinimo: 1,
-		});
+		tx.$queryRaw.mockResolvedValueOnce([{ status: PrismaOsStatus.FINALIZADA }]);
 		prisma.$transaction.mockImplementationOnce(async (fn: any) => fn(tx));
 
-		const resultado = await gateway.executarAprovacao(osDetalhe(), null, new Date());
-
-		expect(resultado.bloqueadaPorFaltaEstoque).toBe(true);
-		expect(resultado.faltantes).toHaveLength(1);
-		expect(tx.insumo.update).not.toHaveBeenCalled();
-		expect(tx.movimentoEstoque.create).not.toHaveBeenCalled();
-		expect(tx.ordemServico.update).toHaveBeenCalledWith({
-			where: { id: "os1" },
-			data: expect.objectContaining({ status: PrismaOsStatus.BLOQUEADA }),
-		});
-	});
-
-	it("executarDesbloqueio sem estoque devolve faltantes sem transicionar", async () => {
-		const tx = baseTx();
-		tx.insumo.findUnique.mockResolvedValueOnce(null);
-		prisma.$transaction.mockImplementationOnce(async (fn: any) => fn(tx));
-
-		const resultado = await gateway.executarDesbloqueio(osDetalhe({ status: OsStatus.BLOQUEADA }), "u1", null, new Date());
-
-		expect(resultado.faltantes).toHaveLength(1);
+		await expect(gateway.executarCancelamento(osDetalhe({ status: OsStatus.EM_EXECUCAO }), "u1", null)).resolves.toBe(false);
+		expect(reserva.estornar).not.toHaveBeenCalled();
 		expect(tx.ordemServico.update).not.toHaveBeenCalled();
+		expect(tx.osHistoricoStatus.create).not.toHaveBeenCalled();
 	});
 
-	it("executarCancelamento com estorno devolve estoque e registra movimento", async () => {
+	it("executarCancelamento usa o status relido sob lock como statusAnterior", async () => {
 		const tx = baseTx();
-		tx.insumo.findUnique.mockResolvedValueOnce({ id: "i1", quantidadeEstoque: 5 });
+		tx.$queryRaw.mockResolvedValueOnce([{ status: PrismaOsStatus.EM_EXECUCAO }]);
 		prisma.$transaction.mockImplementationOnce(async (fn: any) => fn(tx));
 
-		await gateway.executarCancelamento(osDetalhe({ status: OsStatus.EM_EXECUCAO }), "u1", "motivo x", true);
-
-		expect(tx.insumo.update).toHaveBeenCalledWith({ where: { id: "i1" }, data: { quantidadeEstoque: 7 } });
-		expect(tx.movimentoEstoque.create).toHaveBeenCalledWith({
-			data: expect.objectContaining({ tipo: TipoMovimentoEstoque.ESTORNO, quantidade: 2 }),
-		});
-		expect(tx.ordemServico.update).toHaveBeenCalledWith({
-			where: { id: "os1" },
-			data: expect.objectContaining({ status: PrismaOsStatus.CANCELADA }),
+		await expect(gateway.executarCancelamento(osDetalhe({ status: OsStatus.AGUARDANDO_PAGAMENTO }), "u1", null)).resolves.toBe(true);
+		expect(tx.osHistoricoStatus.create).toHaveBeenCalledWith({
+			data: expect.objectContaining({ statusAnterior: PrismaOsStatus.EM_EXECUCAO, statusNovo: PrismaOsStatus.CANCELADA }),
 		});
 	});
 
-	it("executarCancelamento sem estorno não toca no estoque", async () => {
+	it("executarCancelamento sem motivo usa observação padrão", async () => {
 		const tx = baseTx();
 		prisma.$transaction.mockImplementationOnce(async (fn: any) => fn(tx));
-
-		await gateway.executarCancelamento(osDetalhe({ status: OsStatus.BLOQUEADA }), "u1", null, false);
-
-		expect(tx.insumo.findUnique).not.toHaveBeenCalled();
-		expect(tx.movimentoEstoque.create).not.toHaveBeenCalled();
-	});
-
-	it("criarItemServico calcula subtotal e cria PENDENTE", async () => {
-		await gateway.criarItemServico({ ordemServicoId: "os1", servicoId: "s1", precoUnitario: 10, quantidade: 3 });
-		const arg = prisma.osItemServico.create.mock.calls[0][0];
-		expect(arg.data.status).toBe("PENDENTE");
-		expect(String(arg.data.subtotal)).toBe("30");
-	});
-
-	it("criarItemInsumo calcula subtotal", async () => {
-		await gateway.criarItemInsumo({ ordemServicoId: "os1", insumoId: "i1", precoUnitario: 2.5, quantidade: 4 });
-		const arg = prisma.osItemInsumo.create.mock.calls[0][0];
-		expect(String(arg.data.subtotal)).toBe("10");
-	});
-
-	it("iniciarItemServico marca início da OS quando solicitado", async () => {
-		const tx = baseTx();
-		prisma.$transaction.mockImplementationOnce(async (fn: any) => fn(tx));
-		const agora = new Date();
-
-		await gateway.iniciarItemServico({ osId: "os1", itemId: "it1", agora, marcarInicioOs: true });
-
-		expect(tx.osItemServico.update).toHaveBeenCalledWith({
-			where: { id: "it1" },
-			data: { status: "EM_EXECUCAO", iniciadoExecucaoEm: agora },
-		});
-		expect(tx.ordemServico.update).toHaveBeenCalledWith({
-			where: { id: "os1" },
-			data: { iniciadoExecucaoEm: agora },
-		});
-	});
-
-	it("calcularTotal soma subtotais de serviços e insumos", () => {
-		const os = osDetalhe({
-			itensServico: [{ subtotal: 100 }, { subtotal: 50 }] as any,
-			itensInsumo: [{ subtotal: 25 }] as any,
-		});
-		expect(String(gateway.calcularTotal(os))).toBe("175");
+		await gateway.executarCancelamento(osDetalhe(), null, undefined);
+		expect(tx.osHistoricoStatus.create).toHaveBeenCalledWith({ data: expect.objectContaining({ observacao: "OS cancelada" }) });
 	});
 });

@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import type { IServiceResponse } from "semantic-response";
 import { SR } from "../../../../common/utils/service-response.util";
+import { OrquestradorOrdemServico } from "../../../orquestracao-os/application/orquestrador-ordem-servico";
 import { gerarNumeroOs } from "../../domain/numero-os";
 import { OrdemServico } from "../../domain/ordem-servico.entity";
 import {
@@ -19,9 +20,10 @@ export class CriarOsUseCase {
 		@Inject(ORDENS_SERVICO_GATEWAY) private readonly gateway: OrdensServicoGatewayPort,
 		@Inject(CLIENTES_CONSULTA) private readonly clientes: ClientesConsultaPort,
 		@Inject(VEICULOS_CONSULTA) private readonly veiculos: VeiculosConsultaPort,
+		private readonly orquestrador: OrquestradorOrdemServico,
 	) {}
 
-	async execute(dto: { clienteId: string; veiculoId: string }): Promise<IServiceResponse<unknown>> {
+	async execute(dto: { clienteId: string; veiculoId: string }, correlationId: string): Promise<IServiceResponse<unknown>> {
 		const cliente = await this.clientes.buscarPorId(dto.clienteId);
 		if (!cliente) return SR.notFound(undefined, "Cliente não encontrado");
 		if (cliente.ativo === false) return SR.unprocessableEntity(undefined, "Cliente inativado");
@@ -35,14 +37,15 @@ export class CriarOsUseCase {
 		const numero = gerarNumeroOs(ano, (await this.gateway.contarPorAno(ano)) + 1);
 		const os = OrdemServico.criar({ numero, clienteId: dto.clienteId, veiculoId: dto.veiculoId });
 
-		const created = await this.gateway.criarComHistorico({
+		const created = await this.orquestrador.abrirOs({
 			numero: os.numero,
 			clienteId: os.clienteId,
 			veiculoId: os.veiculoId,
+			correlationId,
 		});
-		this.logger.log({ event: "os.created", osId: created.id, numero: os.numero }, CriarOsUseCase.name);
+		this.logger.log({ event: "os.created", osId: created.osId, numero: os.numero }, CriarOsUseCase.name);
 
-		const detalhe = await this.gateway.buscarDetalhePorId(created.id);
+		const detalhe = await this.gateway.buscarDetalhePorId(created.osId);
 		return SR.created(detalhe, "OS criada");
 	}
 }

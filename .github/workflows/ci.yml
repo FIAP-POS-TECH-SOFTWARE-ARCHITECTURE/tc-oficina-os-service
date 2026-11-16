@@ -37,8 +37,17 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Testes unitários
-        run: npm test
+      - name: Testes unitários e BDD com cobertura
+        run: npm run test:cov
+
+      - name: Publicar relatório de cobertura
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: cobertura-os-service
+          path: coverage/
+          retention-days: 14
+          if-no-files-found: warn
 
   e2e:
     name: Testes e2e (Testcontainers)
@@ -67,3 +76,49 @@ jobs:
       - name: Testes e2e
         run: npm run test:e2e
 
+      - name: Testes de integração (MiniStack)
+        run: npm run test:integracao
+
+  sonar:
+    name: Qualidade (SonarQube)
+    runs-on: ubuntu-latest
+    needs: quality
+    timeout-minutes: 25
+    env:
+      DATABASE_URL: "postgresql://placeholder:placeholder@localhost:5432/placeholder"
+    services:
+      sonarqube:
+        image: sonarqube:community
+        ports:
+          - 9000:9000
+        env:
+          SONAR_ES_BOOTSTRAP_CHECKS_DISABLE: "true"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 25
+          cache: npm
+
+      # Dependências e Prisma Client instalados para a análise TypeScript resolver tipos
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Gerar Prisma Client
+        run: npx prisma generate
+
+      - name: Baixar relatório de cobertura
+        uses: actions/download-artifact@v4
+        with:
+          name: cobertura-os-service
+          path: coverage
+
+      - name: Análise e quality gate
+        run: bash scripts/sonar-quality-gate.sh
+        env:
+          SONAR_HOST_URL: http://localhost:9000
