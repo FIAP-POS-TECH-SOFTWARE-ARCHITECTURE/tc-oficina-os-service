@@ -3,14 +3,14 @@
 Manifestos de deploy da aplicação, organizados com **Kustomize**: `k8s/base/` tem os
 recursos comuns e `k8s/overlays/<env>/` os ajustes por ambiente (`homolog`, `prod`).
 `k8s/local/` contém dependências que **só existem para validação local no minikube**:
-em produção o banco é o RDS provisionado via Terraform no repositório `tc-oficina-infra-db` e o SMTP é um
-provedor real.
+em homolog e prod o banco é o RDS provisionado via Terraform no repositório `tc-oficina-infra-db`.
 
 ## Arquivos
 
 | Arquivo | Recurso | Observação |
 |---|---|---|
 | `base/os-service-configmap.yaml` | ConfigMap `os-service-config` | Config **não sensível** (PORT, JWT_EXPIRES_IN, SMTP_HOST/PORT/FROM) |
+| `base/os-service-mailhog.yaml` | Deployment + Service `os-service-mailhog` | SMTP de teste: recebe as notificações da OS sem entregar; interface web via `kubectl port-forward svc/os-service-mailhog 8025:8025` |
 | `base/os-service-deployment.yaml` | Deployment `os-service` | 2 réplicas, probes, `resources.requests/limits`, env do agente New Relic (`NODE_OPTIONS=-r newrelic`) |
 | `base/os-service-service.yaml` | Service `os-service` | `LoadBalancer` (EKS) / `minikube service` (local) |
 | `base/os-service-hpa.yaml` | HPA `os-service-hpa` | CPU 70%, 2→10 réplicas (`autoscaling/v2`) |
@@ -19,7 +19,6 @@ provedor real.
 | `overlays/homolog/kustomization.yaml` | — | `namespace: homolog`, `NEW_RELIC_APP_NAME=oficina-os-service-homolog` |
 | `overlays/prod/kustomization.yaml` | — | `namespace: prod`, `NEW_RELIC_APP_NAME=oficina-os-service-prod` |
 | `local/postgres.yaml` | Postgres + PVC + Service | **Só minikube** |
-| `local/mailhog.yaml` | Mailhog + Service | **Só minikube** |
 
 > O Secret `os-service-secrets` (DATABASE_URL, JWT_SECRET, INTERNAL_API_KEY, NEW_RELIC_LICENSE_KEY, credenciais
 > SMTP/admin) **não** está versionado: é criado via `kubectl` (abaixo, para o minikube) ou
@@ -44,7 +43,7 @@ minikube addons enable metrics-server   # OBRIGATÓRIO: sem ele o HPA fica <unkn
 # 1. Construir a imagem DENTRO do minikube (o Deployment usa imagePullPolicy: IfNotPresent)
 minikube image build -t os-service:local .
 
-# 2. Dependências locais (banco + mailhog)
+# 2. Dependência local (banco)
 kubectl apply -f k8s/local/
 
 # 3. Secret (NUNCA commitado; DATABASE_URL aponta para o Service `postgres` interno)
@@ -83,7 +82,7 @@ receba um EXTERNAL-IP acessível.
 | Aspecto | Local (minikube) | Produção (EKS) |
 |---|---|---|
 | Banco | `k8s/local/postgres.yaml` (Service `postgres`) | RDS via Terraform; `DATABASE_URL` no Secret aponta para o endpoint do RDS |
-| SMTP | Mailhog (`k8s/local/mailhog.yaml`) | Provedor real; `SMTP_HOST` sobrescrito no ConfigMap |
+| SMTP | MailHog da base (`os-service-mailhog`) | O mesmo MailHog; trocar por um provedor real exige só `SMTP_HOST`/`SMTP_PORT` no ConfigMap e as credenciais no Secret |
 | Imagem | `os-service:local` construída no minikube | Imagem do ECR; a pipeline injeta repo+tag no overlay (placeholders `ci-placeholder-image`/`ci-placeholder-tag`) antes do `kubectl apply -k` |
 | Service | `minikube service` / `tunnel` | `LoadBalancer` com ELB real |
 | Métricas p/ HPA | addon `metrics-server` | metrics-server **não vem por padrão no EKS**: instalar manualmente (ver repositório `tc-oficina-infra-k8s`) |

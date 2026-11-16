@@ -5,3 +5,4 @@ resources:
   - os-service-service.yaml
   - os-service-hpa.yaml
   - os-service-configmap.yaml
+  - os-service-mailhog.yaml

@@ -50,7 +50,7 @@ EKS e por banco lógico no RDS, e emite telemetria para o New Relic (APM, logs e
 | Orquestração | Kubernetes (EKS), Kustomize, HPA por CPU, rolling update |
 | CI/CD | GitHub Actions |
 | Emulador AWS local | MiniStack (SNS/SQS/SSM/DynamoDB) |
-| E-mail (dev) | Mailhog |
+| E-mail | MailHog (local e no cluster, `os-service-mailhog`) |
 | Cliente de API | Bruno (export Postman disponível) |
 
 ## Arquitetura deste repositório ✱
@@ -227,7 +227,7 @@ Variáveis mínimas (base em [`.env.example`](.env.example)):
 | `SQS_DLQ_URLS` | CSV das DLQs monitoradas; vazio desliga o monitor |
 | `PRAZO_APROVACAO`, `PRAZO_PAGAMENTO`, `PRAZO_RESPOSTA_SERVICO` | prazos do fluxo, em minutos inteiros |
 | `WORKERS_HABILITADOS` | `false` desliga os workers |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM` | notificação por e-mail (Mailhog em dev) |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM` | notificação por e-mail (MailHog local e no cluster) |
 | `NEW_RELIC_LICENSE_KEY`, `NEW_RELIC_APP_NAME` | observabilidade (só no cluster) |
 
 Outros comandos úteis: `npm run ministack:down` para parar o emulador;
