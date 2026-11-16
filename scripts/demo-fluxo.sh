@@ -233,11 +233,14 @@ esperar_status EM_DIAGNOSTICO
 
 passo "Mecânico registra o diagnóstico com 1 serviço e 1 insumo do catálogo"
 api GET "$EXECUCAO_URL/execucao/catalogo/servicos" "$TOKEN_MEC"
-SERVICO_ID="$(json 'd.data[0].id' <<<"$HTTP_CORPO")"
-info "serviço: $(json 'd.data[0].nome' <<<"$HTTP_CORPO")"
+# Itens coerentes com o texto do diagnóstico; sem eles no catálogo, usa o primeiro de cada lista
+SERVICO="(d.data.find(s => /troca de óleo/i.test(s.nome)) || d.data[0])"
+SERVICO_ID="$(json "$SERVICO.id" <<<"$HTTP_CORPO")"
+info "serviço: $(json "$SERVICO.nome" <<<"$HTTP_CORPO")"
 api GET "$EXECUCAO_URL/execucao/catalogo/insumos" "$TOKEN_MEC"
-INSUMO_ID="$(json 'd.data[0].id' <<<"$HTTP_CORPO")"
-info "insumo: $(json 'd.data[0].nome' <<<"$HTTP_CORPO")"
+INSUMO="(d.data.find(i => /óleo de motor/i.test(i.nome)) || d.data[0])"
+INSUMO_ID="$(json "$INSUMO.id" <<<"$HTTP_CORPO")"
+info "insumo: $(json "$INSUMO.nome" <<<"$HTTP_CORPO")"
 api POST "$EXECUCAO_URL/execucao/ordens/$ORDEM_ID/diagnostico" "$TOKEN_MEC" \
 	"{\"diagnostico\":\"Óleo vencido e filtro saturado.\",\"itens\":[{\"tipo\":\"SERVICO\",\"referenciaId\":\"$SERVICO_ID\",\"quantidade\":1},{\"tipo\":\"INSUMO\",\"referenciaId\":\"$INSUMO_ID\",\"quantidade\":1}]}"
 esperar_status AGUARDANDO_APROVACAO
