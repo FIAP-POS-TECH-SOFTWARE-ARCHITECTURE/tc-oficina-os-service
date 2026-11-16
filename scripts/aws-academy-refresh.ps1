@@ -50,10 +50,18 @@ aws configure set region us-east-1
 Write-Host "Região default configurada (us-east-1)."
 
 # 2) GitHub Secrets nos repositórios de trabalho
+# $ErrorActionPreference não interrompe quando um executável externo falha: sem conferir o
+# $LASTEXITCODE, um secret não gravado passaria em silêncio e o CD daquele repo quebraria
+# depois com "security token expired".
+function Set-RepoSecret([string]$repo, [string]$name, [string]$value) {
+    gh secret set $name --repo $repo --body $value
+    if ($LASTEXITCODE -ne 0) { throw "Falha ao gravar $name em $repo; rode o script de novo" }
+}
+
 foreach ($repo in $repos) {
-    gh secret set AWS_ACCESS_KEY_ID --repo $repo --body $accessKey
-    gh secret set AWS_SECRET_ACCESS_KEY --repo $repo --body $secretKey
-    gh secret set AWS_SESSION_TOKEN --repo $repo --body $sessionToken
+    Set-RepoSecret $repo "AWS_ACCESS_KEY_ID" $accessKey
+    Set-RepoSecret $repo "AWS_SECRET_ACCESS_KEY" $secretKey
+    Set-RepoSecret $repo "AWS_SESSION_TOKEN" $sessionToken
     Write-Host "Secrets atualizados em $repo"
 }
 
