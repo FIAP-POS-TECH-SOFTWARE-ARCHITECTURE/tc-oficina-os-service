@@ -338,7 +338,7 @@ finalização da OS acontecem pelo fluxo orquestrado, não por rotas deste servi
   [`tc-oficina-lambda-auth`](https://github.com/FIAP-POS-TECH-SOFTWARE-ARCHITECTURE/tc-oficina-lambda-auth) ·
   [`tc-oficina-infra-k8s`](https://github.com/FIAP-POS-TECH-SOFTWARE-ARCHITECTURE/tc-oficina-infra-k8s) ·
   [`tc-oficina-infra-db`](https://github.com/FIAP-POS-TECH-SOFTWARE-ARCHITECTURE/tc-oficina-infra-db)
-- **Vídeo de demonstração:** a publicar. Vídeos das fases anteriores: Fase 1
+- **Vídeo de demonstração:** <https://www.youtube.com/watch?v=Sf_hejh9kxk> (não listado, 14:38). Vídeos das fases anteriores: Fase 1
   <https://youtu.be/2yV4mSfs1Uw> · Fase 2 <https://youtu.be/5Tm29h77mHA>.
 
 ## Grupo Integradores
